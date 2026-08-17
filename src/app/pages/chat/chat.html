@@ -11,9 +11,9 @@
                  rounded-full bg-surface-alt
                  text-xs font-semibold text-muted-foreground"
         >
-          {{ c.initials }}
+          {{ getInitials(chatName()) }}
         </div>
-        @if (c.type === 'direct' && c.online) {
+        @if (!c.isGroup && directCounterparts()[c.id]?.isOnline) {
           <span
             class="absolute bottom-0 right-0 h-2.5 w-2.5
                    rounded-full border-2 border-surface bg-online"
@@ -22,14 +22,16 @@
       </div>
 
       <div class="min-w-0 flex-1">
-        <p class="truncate text-sm font-semibold text-foreground">{{ c.name }}</p>
+        <p class="truncate text-sm font-semibold text-foreground">{{ chatName() }}</p>
         <p
           class="truncate text-[11px]"
-          [class]="c.type === 'direct' && c.online ? 'text-online' : 'text-muted-foreground'"
+          [class]="!c.isGroup && directCounterparts()[c.id]?.isOnline ? 'text-online' : 'text-muted-foreground'"
         >
-          {{ c.type === 'group'
+          {{ c.isGroup
             ? memberCount() + ' members'
-            : (selectedChatContact()?.status ?? (c.online ? 'Online' : 'Offline')) }}
+            : (directCounterparts()[c.id]?.isOnline
+                ? 'Online'
+                : (directCounterparts()[c.id]?.lastSeenAt ? formatLastSeen(directCounterparts()[c.id]!.lastSeenAt) : '')) }}
         </p>
       </div>
 
@@ -66,27 +68,40 @@
 
       @for (m of messages(); track m.id) {
 
-        <div class="flex" [class]="m.own ? 'justify-end' : 'justify-start'">
+        <div class="flex" [class]="isOwn(m) ? 'justify-end' : 'justify-start'">
           <div class="max-w-[70%]">
 
-            @if (!m.own && c.type === 'group') {
-              <p class="mb-1 px-1 text-[10px] font-medium text-accent-400">{{ m.senderName }}</p>
+            @if (!isOwn(m) && c.isGroup) {
+              <p class="mb-1 px-1 text-[10px] font-medium text-accent-400">{{ senderName(m) }}</p>
             }
 
             <div
               class="rounded-2xl px-4 py-2.5 text-sm leading-5"
-              [class]="m.own
+              [class]="isOwn(m)
                 ? 'rounded-br-sm bg-gradient-to-br from-accent-500 to-accent2-500 text-white'
                 : 'rounded-bl-sm border border-border bg-surface text-foreground'"
             >
-              {{ m.text }}
+              @if (m.text) {
+                {{ m.text }}
+              }
+              @if (m.attachmentUrl) {
+                <a
+                  [href]="m.attachmentUrl"
+                  target="_blank"
+                  rel="noopener"
+                  class="mt-1 flex items-center gap-1.5 underline underline-offset-2 opacity-90"
+                >
+                  <svg appIcon="attach" class="h-3.5 w-3.5"></svg>
+                  Attachment
+                </a>
+              }
             </div>
 
             <p
               class="mt-1 px-1 text-[10px] text-faint-foreground"
-              [class]="m.own ? 'text-right' : 'text-left'"
+              [class]="isOwn(m) ? 'text-right' : 'text-left'"
             >
-              {{ m.time }}
+              {{ formatMessageTime(m.createdAt) }}
             </p>
 
           </div>

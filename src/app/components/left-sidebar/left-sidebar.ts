@@ -1,6 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Icon } from '../icon/icon';
-import { MockDataService } from '../../services/mock-data.service';
+import { ChatStore } from '../../stores/chat.store';
+import { UserStore } from '../../stores/user.store';
+import { ChatSummary } from '../../interfaces/chat-summary';
+import { formatLastSeen, getInitials } from '../../shared/user-display';
 
 type Tab = 'chats' | 'groups' | 'friends';
 
@@ -11,24 +14,29 @@ type Tab = 'chats' | 'groups' | 'friends';
   styleUrl: './left-sidebar.css',
 })
 export class LeftSidebar {
-  private readonly data = inject(MockDataService);
+  private readonly chatStore = inject(ChatStore);
+  private readonly userStore = inject(UserStore);
 
   protected readonly tab = signal<Tab>('chats');
   protected readonly query = signal('');
 
-  protected readonly chats = this.data.chats;
-  protected readonly groups = this.data.groups;
-  protected readonly friends = this.data.friends;
-  protected readonly selectedChatId = this.data.selectedChatId;
+  protected readonly chats = this.chatStore.chats;
+  protected readonly groups = this.chatStore.groups;
+  protected readonly friends = this.userStore.friends;
+  protected readonly selectedChatId = this.chatStore.selectedChatId;
+  protected readonly directCounterparts = this.chatStore.directCounterparts;
+
+  protected readonly getInitials = getInitials;
+  protected readonly formatLastSeen = formatLastSeen;
 
   protected readonly filteredChats = computed(() =>
-    this.chats().filter((c) => c.name.toLowerCase().includes(this.query().toLowerCase())),
+    this.chats().filter((c) => this.chatName(c).toLowerCase().includes(this.query().toLowerCase())),
   );
   protected readonly filteredGroups = computed(() =>
-    this.groups().filter((c) => c.name.toLowerCase().includes(this.query().toLowerCase())),
+    this.groups().filter((c) => this.chatName(c).toLowerCase().includes(this.query().toLowerCase())),
   );
   protected readonly filteredFriends = computed(() =>
-    this.friends().filter((u) => u.name.toLowerCase().includes(this.query().toLowerCase())),
+    this.friends().filter((u) => u.userName.toLowerCase().includes(this.query().toLowerCase())),
   );
 
   protected readonly count = computed(() => {
@@ -42,6 +50,18 @@ export class LeftSidebar {
     }
   });
 
+  chatName(chat: ChatSummary): string {
+    return chat.isGroup ? (chat.name ?? '') : (this.directCounterparts()[chat.id]?.userName ?? '');
+  }
+
+  chatInitials(chat: ChatSummary): string {
+    return getInitials(this.chatName(chat));
+  }
+
+  chatIsOnline(chat: ChatSummary): boolean {
+    return !chat.isGroup && (this.directCounterparts()[chat.id]?.isOnline ?? false);
+  }
+
   setTab(tab: Tab): void {
     this.tab.set(tab);
   }
@@ -51,10 +71,10 @@ export class LeftSidebar {
   }
 
   selectChat(id: string): void {
-    this.data.selectChat(id);
+    this.chatStore.selectChat(id);
   }
 
   messageFriend(userId: string): void {
-    this.data.openDirectChatWithUser(userId);
+    void this.chatStore.createDirectChat(userId);
   }
 }

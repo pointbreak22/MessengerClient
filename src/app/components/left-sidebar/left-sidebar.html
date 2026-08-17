@@ -113,15 +113,15 @@
                      rounded-full bg-surface-alt
                      text-xs font-semibold text-muted-foreground"
             >
-              {{ chat.initials }}
+              {{ chatInitials(chat) }}
             </div>
-            @if (chat.type === 'direct' && chat.online) {
+            @if (!chat.isGroup && chatIsOnline(chat)) {
               <span
                 class="absolute bottom-0 right-0 h-3 w-3
                        rounded-full border-2 border-surface bg-online"
               ></span>
             }
-            @if (chat.type === 'group') {
+            @if (chat.isGroup) {
               <span
                 class="absolute bottom-0 right-0 flex h-4 w-4
                        items-center justify-center rounded-full
@@ -135,24 +135,15 @@
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
               <span class="truncate text-[13px] font-medium text-foreground">
-                {{ chat.name }}
+                {{ chatName(chat) }}
               </span>
-              <span class="shrink-0 text-[10px] text-faint-foreground">
-                {{ chat.time }}
-              </span>
-            </div>
-
-            <div class="mt-1 flex items-center justify-between gap-2">
-              <p class="truncate text-[11px] text-faint-foreground group-hover:text-muted-foreground">
-                {{ chat.message }}
-              </p>
-              @if (chat.unread) {
+              @if (chat.unreadCount) {
                 <span
-                  class="flex h-5 min-w-5 items-center justify-center
+                  class="flex h-5 min-w-5 shrink-0 items-center justify-center
                          rounded-full bg-accent-500 px-1.5
                          text-[9px] font-semibold text-white"
                 >
-                  {{ chat.unread }}
+                  {{ chat.unreadCount }}
                 </span>
               }
             </div>
@@ -181,29 +172,21 @@
                    from-accent-500/30 to-accent2-500/30
                    text-xs font-semibold text-accent-400"
           >
-            {{ chat.initials }}
+            {{ chatInitials(chat) }}
           </div>
 
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
               <span class="truncate text-[13px] font-medium text-foreground">
-                {{ chat.name }}
+                {{ chatName(chat) }}
               </span>
-              <span class="shrink-0 text-[10px] text-faint-foreground">
-                {{ chat.time }}
-              </span>
-            </div>
-            <div class="mt-1 flex items-center justify-between gap-2">
-              <p class="truncate text-[11px] text-faint-foreground group-hover:text-muted-foreground">
-                {{ chat.message }}
-              </p>
-              @if (chat.unread) {
+              @if (chat.unreadCount) {
                 <span
-                  class="flex h-5 min-w-5 items-center justify-center
+                  class="flex h-5 min-w-5 shrink-0 items-center justify-center
                          rounded-full bg-accent-500 px-1.5
                          text-[9px] font-semibold text-white"
                 >
-                  {{ chat.unread }}
+                  {{ chat.unreadCount }}
                 </span>
               }
             </div>
@@ -230,9 +213,9 @@
                      rounded-full bg-surface-alt
                      text-xs font-semibold text-muted-foreground"
             >
-              {{ friend.initials }}
+              {{ getInitials(friend.userName) }}
             </div>
-            @if (friend.online) {
+            @if (friend.isOnline) {
               <span
                 class="absolute bottom-0 right-0 h-3 w-3
                        rounded-full border-2 border-surface bg-online"
@@ -242,14 +225,14 @@
 
           <div class="min-w-0 flex-1">
             <p class="truncate text-[13px] font-medium text-foreground">
-              {{ friend.name }}
+              {{ friend.userName }}
             </p>
             <p
               class="truncate text-[11px]"
-              [class.text-online]="friend.online"
-              [class.text-faint-foreground]="!friend.online"
+              [class.text-online]="friend.isOnline"
+              [class.text-faint-foreground]="!friend.isOnline"
             >
-              {{ friend.status }}
+              {{ friend.isOnline ? 'Online' : formatLastSeen(friend.lastSeenAt) }}
             </p>
           </div>
 

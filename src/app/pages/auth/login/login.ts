@@ -1,22 +1,17 @@
 import { Component, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { AuthService } from '../../../core/auth/auth.service';
 import { Icon } from '../../../components/icon/icon';
 
 @Component({
   selector: 'app-login',
-  imports: [FormsModule, RouterLink, Icon],
+  imports: [Icon],
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
 export class Login {
-  private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
 
-  email = '';
-  password = '';
-  rememberMe = true;
-
-  submit(): void {
-    this.router.navigateByUrl('/');
+  signIn(): void {
+    this.auth.login();
   }
 }

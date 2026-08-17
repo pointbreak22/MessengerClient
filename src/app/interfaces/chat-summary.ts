@@ -1,5 +1,4 @@
-// Real API shape (GET /chats/me) — distinct from interfaces/chat.ts, which is
-// the mock/UI-facing shape MockDataService still drives the current UI with.
+// API shape (GET /chats/me).
 export interface ChatMember {
   chatId: string;
   userId: string;

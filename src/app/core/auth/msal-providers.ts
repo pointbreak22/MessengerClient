@@ -34,8 +34,8 @@ function msalInterceptorConfigFactory(): MsalInterceptorConfiguration {
   };
 }
 
-// Not registered in app.config.ts yet — see the TODO there. Spread this array
-// into `providers` once real Azure AD App Registration values exist in msal.config.ts.
+// Registered in app.config.ts. Backed by the real Entra External ID (CIAM)
+// App Registration values in msal.config.ts.
 export const msalProviders: Provider[] = [
   { provide: MSAL_INSTANCE, useFactory: msalInstanceFactory },
   { provide: MSAL_GUARD_CONFIG, useFactory: msalGuardConfigFactory },

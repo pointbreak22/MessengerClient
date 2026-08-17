@@ -1,11 +1,11 @@
 import { Routes } from '@angular/router';
+import { MsalGuard } from '@azure/msal-angular';
+import { guestGuard } from './core/auth/auth.guard';
 import { Login } from './pages/auth/login/login';
-import { Register } from './pages/auth/register/register';
 import { Dashboard } from './pages/dashboard/dashboard';
 
 export const routes: Routes = [
-  { path: '', component: Dashboard },
-  { path: 'login', component: Login },
-  { path: 'register', component: Register },
+  { path: '', component: Dashboard, canActivate: [MsalGuard] },
+  { path: 'login', component: Login, canActivate: [guestGuard] },
   { path: '**', redirectTo: '' },
 ];

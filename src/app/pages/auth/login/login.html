@@ -65,7 +65,7 @@
 
     </div>
 
-    <!-- Form -->
+    <!-- Card -->
     <div
       class="rounded-2xl
              border border-border
@@ -74,116 +74,11 @@
              shadow-2xl shadow-black/30"
     >
 
-      <!-- Email -->
-      <div>
-
-        <label
-          class="mb-2 block text-xs font-medium text-muted-foreground"
-        >
-          Email
-        </label>
-
-        <div class="relative">
-
-          <svg
-            appIcon="mail"
-            class="absolute left-3.5 top-1/2
-                   h-4 w-4 -translate-y-1/2
-                   text-faint-foreground"
-          ></svg>
-
-          <input
-            [(ngModel)]="email"
-            type="email"
-            placeholder="you@example.com"
-            class="h-11 w-full rounded-xl
-                   border border-border
-                   bg-surface-hover
-                   pl-10 pr-4
-                   text-sm text-foreground
-                   outline-none
-                   placeholder:text-faint-foreground
-                   transition
-                   focus:border-accent-500/50"
-          />
-
-        </div>
-
-      </div>
-
-      <!-- Password -->
-      <div class="mt-5">
-
-        <div class="mb-2 flex items-center justify-between">
-
-          <label
-            class="text-xs font-medium text-muted-foreground"
-          >
-            Password
-          </label>
-
-          <button
-            type="button"
-            class="text-[11px] text-accent-400
-                   hover:text-accent-500"
-          >
-            Forgot password?
-          </button>
-
-        </div>
-
-        <div class="relative">
-
-          <svg
-            appIcon="lock"
-            class="absolute left-3.5 top-1/2
-                   h-4 w-4 -translate-y-1/2
-                   text-faint-foreground"
-          ></svg>
-
-          <input
-            [(ngModel)]="password"
-            type="password"
-            placeholder="Enter your password"
-            class="h-11 w-full rounded-xl
-                   border border-border
-                   bg-surface-hover
-                   pl-10 pr-4
-                   text-sm text-foreground
-                   outline-none
-                   placeholder:text-faint-foreground
-                   transition
-                   focus:border-accent-500/50"
-          />
-
-        </div>
-
-      </div>
-
-      <!-- Remember -->
-      <label
-        class="mt-5 flex cursor-pointer items-center gap-2"
-      >
-
-        <input
-          [(ngModel)]="rememberMe"
-          type="checkbox"
-          class="h-4 w-4 rounded border-border-strong
-                 bg-surface-hover
-                 accent-accent-500"
-        />
-
-        <span class="text-xs text-muted-foreground">
-          Remember me
-        </span>
-
-      </label>
-
-      <!-- Submit -->
       <button
         type="button"
-        (click)="submit()"
-        class="mt-6 h-11 w-full rounded-xl
+        (click)="signIn()"
+        class="flex h-11 w-full items-center
+               justify-center gap-2 rounded-xl
                bg-accent-500
                text-sm font-medium text-white
                shadow-lg shadow-accent-500/20
@@ -191,45 +86,14 @@
                hover:bg-accent-400
                active:scale-[0.99]"
       >
-        Sign in
+        Sign in with Microsoft
       </button>
 
-      <!-- Divider -->
-      <div class="my-6 flex items-center gap-3">
-
-        <div class="h-px flex-1 bg-border"></div>
-
-        <span class="text-[10px] text-faint-foreground">
-          OR
-        </span>
-
-        <div class="h-px flex-1 bg-border"></div>
-
-      </div>
-
-      <!-- Google -->
-      <button
-        type="button"
-        class="flex h-11 w-full items-center
-               justify-center gap-3 rounded-xl
-               border border-border
-               bg-surface-hover
-               text-sm font-medium text-muted-foreground
-               transition hover:bg-surface-alt"
-      >
-
-        <span class="text-base font-bold">G</span>
-
-        Continue with Google
-
-      </button>
+      <p class="mt-4 text-center text-xs text-muted-foreground">
+        New here? The sign-in screen also lets you create an account.
+      </p>
 
     </div>
-
-    <p class="mt-6 text-center text-xs text-muted-foreground">
-      Don't have an account?
-      <a routerLink="/register" class="font-medium text-accent-400 hover:text-accent-500">Sign up</a>
-    </p>
 
     <p class="mt-6 text-center text-[11px] text-faint-foreground">
       © 2026 Messenger

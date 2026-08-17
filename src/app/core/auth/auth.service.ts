@@ -2,16 +2,21 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { MsalBroadcastService, MsalService } from '@azure/msal-angular';
 import { AccountInfo, EventType } from '@azure/msal-browser';
 import { filter, firstValueFrom } from 'rxjs';
+import { UserApiService } from '../../services/user-api.service';
+import { UserProfile } from '../../interfaces/user-profile';
 import { apiScope } from './msal.config';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly msal = inject(MsalService);
   private readonly broadcast = inject(MsalBroadcastService);
+  private readonly userApi = inject(UserApiService);
 
   private readonly _currentAccount = signal<AccountInfo | null>(this.msal.instance.getActiveAccount());
+  private readonly _currentUserProfile = signal<UserProfile | null>(null);
 
   readonly currentAccount = this._currentAccount.asReadonly();
+  readonly currentUserProfile = this._currentUserProfile.asReadonly();
   readonly isAuthenticated = computed(() => this._currentAccount() !== null);
 
   constructor() {
@@ -25,6 +30,7 @@ export class AuthService {
         const active = this.msal.instance.getActiveAccount() ?? this.msal.instance.getAllAccounts()[0] ?? null;
         if (active) this.msal.instance.setActiveAccount(active);
         this._currentAccount.set(active);
+        if (active) void this.loadCurrentUserProfile();
       });
   }
 
@@ -33,6 +39,7 @@ export class AuthService {
   }
 
   logout(): void {
+    this._currentUserProfile.set(null);
     this.msal.logoutRedirect().subscribe();
   }
 
@@ -46,5 +53,10 @@ export class AuthService {
     } catch {
       return null;
     }
+  }
+
+  private async loadCurrentUserProfile(): Promise<void> {
+    const profile = await firstValueFrom(this.userApi.getMe());
+    this._currentUserProfile.set(profile);
   }
 }

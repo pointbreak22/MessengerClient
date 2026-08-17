@@ -1,15 +1,21 @@
 import { Component, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from '../icon/icon';
-import { MockDataService } from '../../services/mock-data.service';
+import { getInitials } from '../../shared/user-display';
 
 @Component({
   selector: 'app-header',
-  imports: [RouterLink, Icon],
+  imports: [Icon],
   templateUrl: './header.html',
   styleUrl: './header.css',
 })
 export class Header {
-  private readonly data = inject(MockDataService);
-  protected readonly currentUser = this.data.currentUser;
+  private readonly auth = inject(AuthService);
+
+  protected readonly currentUser = this.auth.currentUserProfile;
+  protected readonly getInitials = getInitials;
+
+  signOut(): void {
+    this.auth.logout();
+  }
 }

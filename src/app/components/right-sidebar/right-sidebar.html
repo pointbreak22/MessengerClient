@@ -10,7 +10,7 @@
     <!-- Selected conversation -->
     <div class="flex items-center justify-between px-4 pt-4">
       <span class="text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
-        {{ chat.type === 'group' ? 'Group info' : 'Contact info' }}
+        {{ chat.isGroup ? 'Group info' : 'Contact info' }}
       </span>
       <button
         (click)="close()"
@@ -31,9 +31,9 @@
                  text-xl font-semibold text-accent-400
                  ring-4 ring-accent-500/5"
         >
-          {{ chat.initials }}
+          {{ getInitials(chatName()) }}
         </div>
-        @if (chat.type === 'direct' && chat.online) {
+        @if (!chat.isGroup && selectedChatContact()?.isOnline) {
           <span
             class="absolute bottom-1 right-1 h-4 w-4
                    rounded-full border-[3px] border-surface
@@ -42,15 +42,17 @@
         }
       </div>
 
-      <h3 class="mt-4 text-sm font-semibold text-foreground">{{ chat.name }}</h3>
+      <h3 class="mt-4 text-sm font-semibold text-foreground">{{ chatName() }}</h3>
 
       <p
         class="mt-1 text-xs"
-        [class]="chat.type === 'direct' && chat.online ? 'text-online' : 'text-muted-foreground'"
+        [class]="!chat.isGroup && selectedChatContact()?.isOnline ? 'text-online' : 'text-muted-foreground'"
       >
-        {{ chat.type === 'group'
-          ? memberCount() + ' members'
-          : (selectedChatContact()?.status ?? (chat.online ? 'Online' : 'Offline')) }}
+        {{ chat.isGroup
+          ? (otherMembers().length + 1) + ' members'
+          : (selectedChatContact()?.isOnline
+              ? 'Online'
+              : (selectedChatContact()?.lastSeenAt ? formatLastSeen(selectedChatContact()!.lastSeenAt) : '')) }}
       </p>
 
       <div class="mt-4 flex gap-2">
@@ -79,23 +81,10 @@
 
     <div class="flex-1 overflow-y-auto p-4">
 
-      @if (chat.type === 'direct' && selectedChatContact(); as contact) {
-        <section>
-          <p class="mb-3 px-1 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">About</p>
-          <div class="rounded-xl border border-border bg-surface-alt p-3">
-            <p class="text-xs leading-5 text-muted-foreground">{{ contact.bio }}</p>
-            <div class="mt-3 flex items-center gap-2 text-[11px] text-faint-foreground">
-              <svg appIcon="location" class="h-3.5 w-3.5"></svg>
-              {{ contact.location }}
-            </div>
-          </div>
-        </section>
-      }
-
-      @if (chat.type === 'group') {
+      @if (chat.isGroup) {
         <section>
           <p class="mb-3 px-1 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
-            Members — {{ memberCount() }}
+            Members — {{ otherMembers().length + 1 }}
           </p>
           <div class="space-y-1">
 
@@ -106,12 +95,12 @@
                        from-accent-500/30 to-accent2-500/30
                        text-xs font-semibold text-accent-400"
               >
-                {{ currentUser.initials }}
+                {{ getInitials(currentUser()?.userName) }}
               </div>
-              <p class="truncate text-xs font-medium text-foreground">{{ currentUser.name }} (you)</p>
+              <p class="truncate text-xs font-medium text-foreground">{{ currentUser()?.userName }} (you)</p>
             </div>
 
-            @for (m of selectedChatMembers(); track m.id) {
+            @for (m of otherMembers(); track m.id) {
               <div class="flex items-center gap-3 rounded-xl p-2 transition hover:bg-surface-hover">
                 <div class="relative shrink-0">
                   <div
@@ -119,9 +108,9 @@
                            rounded-full bg-surface-alt
                            text-xs font-semibold text-muted-foreground"
                   >
-                    {{ m.initials }}
+                    {{ getInitials(m.userName) }}
                   </div>
-                  @if (m.online) {
+                  @if (m.isOnline) {
                     <span
                       class="absolute bottom-0 right-0 h-2.5 w-2.5
                              rounded-full border-2 border-surface bg-online"
@@ -129,9 +118,9 @@
                   }
                 </div>
                 <div class="min-w-0 flex-1">
-                  <p class="truncate text-xs font-medium text-foreground">{{ m.name }}</p>
-                  <p class="truncate text-[10px]" [class]="m.online ? 'text-online' : 'text-faint-foreground'">
-                    {{ m.status }}
+                  <p class="truncate text-xs font-medium text-foreground">{{ m.userName }}</p>
+                  <p class="truncate text-[10px]" [class]="m.isOnline ? 'text-online' : 'text-faint-foreground'">
+                    {{ m.isOnline ? 'Online' : formatLastSeen(m.lastSeenAt) }}
                   </p>
                 </div>
               </div>
@@ -172,7 +161,7 @@
                  text-xl font-semibold text-accent-400
                  ring-4 ring-accent-500/5"
         >
-          {{ currentUser.initials }}
+          {{ getInitials(currentUser()?.userName) }}
         </div>
         <span
           class="absolute bottom-1 right-1 h-4 w-4
@@ -180,8 +169,8 @@
         ></span>
       </div>
 
-      <h3 class="mt-4 text-sm font-semibold text-foreground">{{ currentUser.name }}</h3>
-      <p class="mt-1 text-xs text-online">{{ currentUser.status }}</p>
+      <h3 class="mt-4 text-sm font-semibold text-foreground">{{ currentUser()?.userName }}</h3>
+      <p class="mt-1 text-xs text-online">Online</p>
 
     </div>
 
@@ -204,7 +193,7 @@
                          rounded-full bg-surface-alt
                          text-xs font-semibold text-muted-foreground"
                 >
-                  {{ u.initials }}
+                  {{ getInitials(u.userName) }}
                 </div>
                 <span
                   class="absolute bottom-0 right-0 h-2.5 w-2.5
@@ -212,8 +201,8 @@
                 ></span>
               </div>
               <div class="min-w-0 flex-1">
-                <p class="truncate text-xs font-medium text-foreground">{{ u.name }}</p>
-                <p class="truncate text-[10px] text-online">{{ u.status }}</p>
+                <p class="truncate text-xs font-medium text-foreground">{{ u.userName }}</p>
+                <p class="truncate text-[10px] text-online">Online</p>
               </div>
             </button>
           } @empty {
