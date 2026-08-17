@@ -1,0 +1,151 @@
+<div class="flex h-full flex-col">
+
+  @if (chat(); as c) {
+
+    <!-- Chat header -->
+    <div class="flex items-center gap-3 border-b border-border bg-surface px-5 py-3">
+
+      <div class="relative shrink-0">
+        <div
+          class="flex h-10 w-10 items-center justify-center
+                 rounded-full bg-surface-alt
+                 text-xs font-semibold text-muted-foreground"
+        >
+          {{ c.initials }}
+        </div>
+        @if (c.type === 'direct' && c.online) {
+          <span
+            class="absolute bottom-0 right-0 h-2.5 w-2.5
+                   rounded-full border-2 border-surface bg-online"
+          ></span>
+        }
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-sm font-semibold text-foreground">{{ c.name }}</p>
+        <p
+          class="truncate text-[11px]"
+          [class]="c.type === 'direct' && c.online ? 'text-online' : 'text-muted-foreground'"
+        >
+          {{ c.type === 'group'
+            ? memberCount() + ' members'
+            : (selectedChatContact()?.status ?? (c.online ? 'Online' : 'Offline')) }}
+        </p>
+      </div>
+
+      <div class="flex items-center gap-1">
+
+        <button
+          class="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+          title="Call"
+        >
+          <svg appIcon="call" class="h-4 w-4"></svg>
+        </button>
+
+        <button
+          class="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+          title="Video call"
+        >
+          <svg appIcon="video" class="h-4 w-4"></svg>
+        </button>
+
+        <button
+          (click)="close()"
+          class="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+          title="Close conversation"
+        >
+          <svg appIcon="close" class="h-4 w-4"></svg>
+        </button>
+
+      </div>
+
+    </div>
+
+    <!-- Messages -->
+    <div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+
+      @for (m of messages(); track m.id) {
+
+        <div class="flex" [class]="m.own ? 'justify-end' : 'justify-start'">
+          <div class="max-w-[70%]">
+
+            @if (!m.own && c.type === 'group') {
+              <p class="mb-1 px-1 text-[10px] font-medium text-accent-400">{{ m.senderName }}</p>
+            }
+
+            <div
+              class="rounded-2xl px-4 py-2.5 text-sm leading-5"
+              [class]="m.own
+                ? 'rounded-br-sm bg-gradient-to-br from-accent-500 to-accent2-500 text-white'
+                : 'rounded-bl-sm border border-border bg-surface text-foreground'"
+            >
+              {{ m.text }}
+            </div>
+
+            <p
+              class="mt-1 px-1 text-[10px] text-faint-foreground"
+              [class]="m.own ? 'text-right' : 'text-left'"
+            >
+              {{ m.time }}
+            </p>
+
+          </div>
+        </div>
+
+      } @empty {
+        <div class="flex h-full items-center justify-center text-xs text-faint-foreground">
+          No messages yet. Say hi 👋
+        </div>
+      }
+
+    </div>
+
+    <!-- Composer -->
+    <div class="border-t border-border bg-surface px-4 py-3">
+
+      <form (submit)="onEnter($event)" class="flex items-end gap-2">
+
+        <button
+          type="button"
+          class="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+          title="Attach"
+        >
+          <svg appIcon="attach" class="h-[18px] w-[18px]"></svg>
+        </button>
+
+        <input
+          type="text"
+          [ngModel]="draft()"
+          (ngModelChange)="draft.set($event)"
+          name="draft"
+          placeholder="Write a message..."
+          class="h-10 w-full rounded-xl
+                 border border-border
+                 bg-surface-alt px-4
+                 text-sm text-foreground
+                 outline-none
+                 placeholder:text-faint-foreground
+                 transition
+                 focus:border-accent-500/40"
+        />
+
+        <button
+          type="submit"
+          [disabled]="!draft().trim()"
+          class="grid h-10 w-10 shrink-0 place-items-center rounded-xl
+                 bg-accent-500
+                 text-white shadow-lg shadow-accent-500/20
+                 transition
+                 hover:bg-accent-400
+                 disabled:cursor-not-allowed disabled:opacity-40"
+          title="Send">
+          <svg appIcon="send" class="h-4 w-4"></svg>
+        </button>
+
+      </form>
+
+    </div>
+
+  }
+
+</div>

@@ -1,0 +1,229 @@
+<aside
+  class="hidden w-[300px] shrink-0 flex-col
+         border-l border-border
+         bg-surface
+         xl:flex"
+>
+
+  @if (selectedChat(); as chat) {
+
+    <!-- Selected conversation -->
+    <div class="flex items-center justify-between px-4 pt-4">
+      <span class="text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+        {{ chat.type === 'group' ? 'Group info' : 'Contact info' }}
+      </span>
+      <button
+        (click)="close()"
+        title="Close"
+        class="grid h-7 w-7 place-items-center rounded-lg text-faint-foreground transition hover:bg-surface-hover hover:text-foreground"
+      >
+        <svg appIcon="close" class="h-4 w-4"></svg>
+      </button>
+    </div>
+
+    <div class="flex flex-col items-center border-b border-border px-5 pb-7 pt-3">
+
+      <div class="relative">
+        <div
+          class="flex h-20 w-20 items-center justify-center
+                 rounded-full bg-gradient-to-br
+                 from-accent-500/30 to-accent2-500/30
+                 text-xl font-semibold text-accent-400
+                 ring-4 ring-accent-500/5"
+        >
+          {{ chat.initials }}
+        </div>
+        @if (chat.type === 'direct' && chat.online) {
+          <span
+            class="absolute bottom-1 right-1 h-4 w-4
+                   rounded-full border-[3px] border-surface
+                   bg-online"
+          ></span>
+        }
+      </div>
+
+      <h3 class="mt-4 text-sm font-semibold text-foreground">{{ chat.name }}</h3>
+
+      <p
+        class="mt-1 text-xs"
+        [class]="chat.type === 'direct' && chat.online ? 'text-online' : 'text-muted-foreground'"
+      >
+        {{ chat.type === 'group'
+          ? memberCount() + ' members'
+          : (selectedChatContact()?.status ?? (chat.online ? 'Online' : 'Offline')) }}
+      </p>
+
+      <div class="mt-4 flex gap-2">
+
+        <button
+          class="flex h-9 w-9 items-center justify-center
+                 rounded-xl border border-border
+                 bg-surface-alt text-faint-foreground
+                 hover:bg-surface-hover hover:text-muted-foreground"
+        >
+          <svg appIcon="call" class="h-4 w-4"></svg>
+        </button>
+
+        <button
+          class="flex h-9 w-9 items-center justify-center
+                 rounded-xl border border-border
+                 bg-surface-alt text-faint-foreground
+                 hover:bg-surface-hover hover:text-muted-foreground"
+        >
+          <svg appIcon="video" class="h-4 w-4"></svg>
+        </button>
+
+      </div>
+
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4">
+
+      @if (chat.type === 'direct' && selectedChatContact(); as contact) {
+        <section>
+          <p class="mb-3 px-1 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">About</p>
+          <div class="rounded-xl border border-border bg-surface-alt p-3">
+            <p class="text-xs leading-5 text-muted-foreground">{{ contact.bio }}</p>
+            <div class="mt-3 flex items-center gap-2 text-[11px] text-faint-foreground">
+              <svg appIcon="location" class="h-3.5 w-3.5"></svg>
+              {{ contact.location }}
+            </div>
+          </div>
+        </section>
+      }
+
+      @if (chat.type === 'group') {
+        <section>
+          <p class="mb-3 px-1 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+            Members — {{ memberCount() }}
+          </p>
+          <div class="space-y-1">
+
+            <div class="flex items-center gap-3 rounded-xl p-2">
+              <div
+                class="flex h-9 w-9 items-center justify-center
+                       rounded-full bg-gradient-to-br
+                       from-accent-500/30 to-accent2-500/30
+                       text-xs font-semibold text-accent-400"
+              >
+                {{ currentUser.initials }}
+              </div>
+              <p class="truncate text-xs font-medium text-foreground">{{ currentUser.name }} (you)</p>
+            </div>
+
+            @for (m of selectedChatMembers(); track m.id) {
+              <div class="flex items-center gap-3 rounded-xl p-2 transition hover:bg-surface-hover">
+                <div class="relative shrink-0">
+                  <div
+                    class="flex h-9 w-9 items-center justify-center
+                           rounded-full bg-surface-alt
+                           text-xs font-semibold text-muted-foreground"
+                  >
+                    {{ m.initials }}
+                  </div>
+                  @if (m.online) {
+                    <span
+                      class="absolute bottom-0 right-0 h-2.5 w-2.5
+                             rounded-full border-2 border-surface bg-online"
+                    ></span>
+                  }
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-xs font-medium text-foreground">{{ m.name }}</p>
+                  <p class="truncate text-[10px]" [class]="m.online ? 'text-online' : 'text-faint-foreground'">
+                    {{ m.status }}
+                  </p>
+                </div>
+              </div>
+            }
+
+          </div>
+        </section>
+      }
+
+      <!-- Shared media -->
+      <section class="mt-6">
+
+        <div class="mb-3 flex items-center justify-between px-1">
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">Shared media</p>
+          <button class="text-[10px] text-accent-400 hover:text-accent-500">View all</button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-1.5">
+          <div class="aspect-square rounded-lg bg-gradient-to-br from-accent-500/20 to-surface-alt"></div>
+          <div class="aspect-square rounded-lg bg-gradient-to-br from-accent2-500/20 to-surface-alt"></div>
+          <div class="aspect-square rounded-lg bg-gradient-to-br from-accent-600/20 to-surface-alt"></div>
+        </div>
+
+      </section>
+
+    </div>
+
+  } @else {
+
+    <!-- Default: my profile + who's online -->
+    <div class="flex flex-col items-center border-b border-border px-5 py-7">
+
+      <div class="relative">
+        <div
+          class="flex h-20 w-20 items-center justify-center
+                 rounded-full bg-gradient-to-br
+                 from-accent-500/30 to-accent2-500/30
+                 text-xl font-semibold text-accent-400
+                 ring-4 ring-accent-500/5"
+        >
+          {{ currentUser.initials }}
+        </div>
+        <span
+          class="absolute bottom-1 right-1 h-4 w-4
+                 rounded-full border-[3px] border-surface bg-online"
+        ></span>
+      </div>
+
+      <h3 class="mt-4 text-sm font-semibold text-foreground">{{ currentUser.name }}</h3>
+      <p class="mt-1 text-xs text-online">{{ currentUser.status }}</p>
+
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4">
+
+      <section>
+        <p class="mb-3 px-1 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+          Online now — {{ onlineFriends().length }}
+        </p>
+
+        <div class="space-y-1">
+          @for (u of onlineFriends(); track u.id) {
+            <button
+              (click)="messageFriend(u.id)"
+              class="group flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-surface-hover"
+            >
+              <div class="relative shrink-0">
+                <div
+                  class="flex h-9 w-9 items-center justify-center
+                         rounded-full bg-surface-alt
+                         text-xs font-semibold text-muted-foreground"
+                >
+                  {{ u.initials }}
+                </div>
+                <span
+                  class="absolute bottom-0 right-0 h-2.5 w-2.5
+                         rounded-full border-2 border-surface bg-online"
+                ></span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-xs font-medium text-foreground">{{ u.name }}</p>
+                <p class="truncate text-[10px] text-online">{{ u.status }}</p>
+              </div>
+            </button>
+          } @empty {
+            <p class="px-1 text-xs text-faint-foreground">No one is online right now</p>
+          }
+        </div>
+      </section>
+
+    </div>
+
+  }
+
+</aside>

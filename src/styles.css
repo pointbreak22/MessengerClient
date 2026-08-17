@@ -1,1 +1,31 @@
 /* You can add global styles to this file, and also import other style files */
+@import "tailwindcss";
+
+@theme {
+  /* surfaces — depth hierarchy, darkest to lightest */
+  --color-background: #08090d;
+  --color-surface: #0c0e13;
+  --color-surface-alt: #0f1117;
+  --color-surface-elevated: #14171f;
+  --color-surface-hover: #1a1e27;
+
+  /* borders */
+  --color-border: #1e222b;
+  --color-border-strong: #272c37;
+
+  /* text */
+  --color-foreground: #f2f3f5;
+  --color-muted-foreground: #9aa0ab;
+  --color-faint-foreground: #5b616d;
+
+  /* accent: blue -> cyan */
+  --color-accent-400: #38bdf8;
+  --color-accent-500: #0ea5e9;
+  --color-accent-600: #0284c7;
+  --color-accent2-400: #22d3ee;
+  --color-accent2-500: #06b6d4;
+  --color-accent2-600: #0891b2;
+
+  /* status */
+  --color-online: #22c55e;
+}
