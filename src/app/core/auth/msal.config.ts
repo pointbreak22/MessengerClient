@@ -22,6 +22,7 @@ export const msalConfig: Configuration = {
         else if (level === LogLevel.Warning) console.warn(message);
       },
       logLevel: LogLevel.Warning,
+      piiLoggingEnabled: true,
     },
   },
 };
