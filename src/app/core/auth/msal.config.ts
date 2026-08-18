@@ -3,11 +3,13 @@ import { Configuration, LogLevel } from '@azure/msal-browser';
 export const msalConfig: Configuration = {
   auth: {
     clientId: 'e3125d24-62d4-403d-94f8-7c4a78040a02',
-    authority: 'https://messengerpointbreak22.ciamlogin.com/',
+    // ДОБАВЛЕН ТЕНАНТ В КОНЕЦ ССЫЛКИ:
+    authority: 'https://messengerpointbreak22.ciamlogin.com/messengerpointbreak22.onmicrosoft.com/',
     knownAuthorities: ['messengerpointbreak22.ciamlogin.com'],
-    // Заменяем '/' на полный Origin (работает и на localhost, и на Azure Static Web Apps)
-    redirectUri: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4200',
-    postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4200',
+
+    // Динамический Origin для работы и на localhost, и в Azure:
+    redirectUri: typeof window !== 'undefined' ? window.location.origin : '/',
+    postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin : '/',
   },
   cache: {
     cacheLocation: 'localStorage',
