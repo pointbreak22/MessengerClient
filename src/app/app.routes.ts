@@ -6,7 +6,7 @@ import { Dashboard } from './pages/dashboard/dashboard';
 
 export const routes: Routes = [
   { path: '', component: Dashboard
-      //, canActivate: [MsalGuard]
+      , canActivate: [MsalGuard]
   },
   { path: 'login', component: Login, canActivate: [guestGuard] },
   { path: '**', redirectTo: '' },
