@@ -3,8 +3,7 @@ import { Configuration, LogLevel } from '@azure/msal-browser';
 export const msalConfig: Configuration = {
   auth: {
     clientId: 'e3125d24-62d4-403d-94f8-7c4a78040a02',
-    // ДОБАВЛЕН ТЕНАНТ В КОНЕЦ ССЫЛКИ:
-    authority: 'https://messengerpointbreak22.ciamlogin.com/messengerpointbreak22.onmicrosoft.com/',
+    authority: 'https://messengerpointbreak22.ciamlogin.com/57a5831e-59a5-4fd7-941e-47ce69ea69d0',
     knownAuthorities: ['messengerpointbreak22.ciamlogin.com'],
 
     // Динамический Origin для работы и на localhost, и в Azure:
