@@ -1,4 +1,4 @@
-import { Configuration } from '@azure/msal-browser';
+import { Configuration, LogLevel } from '@azure/msal-browser';
 
 export const msalConfig: Configuration = {
   auth: {
@@ -11,6 +11,18 @@ export const msalConfig: Configuration = {
   },
   cache: {
     cacheLocation: 'localStorage',
+  },
+  system: {
+    // MsalGuard swallows every internal MSAL error into a bare `catchError(() => of(false))`
+    // and only reports it through this logger — without a callback wired up, auth failures
+    // (bad authority, network, config) fail the guard completely silently, no console output.
+    loggerOptions: {
+      loggerCallback: (level, message) => {
+        if (level === LogLevel.Error) console.error(message);
+        else if (level === LogLevel.Warning) console.warn(message);
+      },
+      logLevel: LogLevel.Warning,
+    },
   },
 };
 
