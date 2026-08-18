@@ -26,7 +26,12 @@ function msalGuardConfigFactory(): MsalGuardConfiguration {
 
 function msalInterceptorConfigFactory(): MsalInterceptorConfiguration {
   const protectedResourceMap = new Map<string, Array<string> | null>();
-  protectedResourceMap.set(environment.apiBaseUrl, [apiScope]);
+
+  // Нормализуем URL: гарантируем наличие слэша на конце
+  const rawUrl = environment.apiBaseUrl;
+  const normalizedUrl = rawUrl.endsWith('/') ? rawUrl : `${rawUrl}/`;
+
+  protectedResourceMap.set(normalizedUrl, [apiScope]);
 
   return {
     interactionType: InteractionType.Redirect,
