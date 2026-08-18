@@ -14,7 +14,7 @@ export class ChatHubService {
     if (this.connection) return;
 
     const connection = new HubConnectionBuilder()
-      .withUrl(`${environment.hubUrl}/chathub`, {
+      .withUrl(environment.hubUrl, {
         accessTokenFactory: () => this.auth.getAccessToken().then((token) => token ?? ''),
       })
       .withAutomaticReconnect()
