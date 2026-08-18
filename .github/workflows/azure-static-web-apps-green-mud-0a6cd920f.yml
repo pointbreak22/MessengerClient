@@ -9,7 +9,7 @@ on:
     branches:
       - main
 
-jjobs:
+jobs:
   build_and_deploy_job:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
@@ -37,10 +37,10 @@ jjobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_GREEN_MUD_0A6CD920F }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "dist/messenger-client/browser" # Берём готовую папку
+          app_location: "dist/messenger-client/browser"
           api_location: ""
-          output_location: "" # Сборка уже выполнена, Azure не нужно ничего собирать заново
-          skip_app_build: true # Отключаем встроенный авто-сборщик Azure
+          output_location: ""
+          skip_app_build: true
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
@@ -53,3 +53,4 @@ jjobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_GREEN_MUD_0A6CD920F }}
           action: "close"
+          app_location: "" # <--- Добавьте эту строку
