@@ -27,11 +27,13 @@ function msalGuardConfigFactory(): MsalGuardConfiguration {
 function msalInterceptorConfigFactory(): MsalInterceptorConfiguration {
   const protectedResourceMap = new Map<string, Array<string> | null>();
 
-  // Нормализуем URL: гарантируем наличие слэша на конце
-  const rawUrl = environment.apiBaseUrl;
-  const normalizedUrl = rawUrl.endsWith('/') ? rawUrl : `${rawUrl}/`;
+  const rawUrl = environment.apiBaseUrl.trim();
+  const urlWithSlash = rawUrl.endsWith('/') ? rawUrl : `${rawUrl}/`;
+  const urlWithoutSlash = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
 
-  protectedResourceMap.set(normalizedUrl, [apiScope]);
+  // Скоупы указываются прямо здесь
+  protectedResourceMap.set(urlWithSlash, [apiScope]);
+  protectedResourceMap.set(urlWithoutSlash, [apiScope]);
 
   return {
     interactionType: InteractionType.Redirect,
