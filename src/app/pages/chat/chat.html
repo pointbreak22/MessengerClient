@@ -3,7 +3,15 @@
   @if (chat(); as c) {
 
     <!-- Chat header -->
-    <div class="flex items-center gap-3 border-b border-border bg-surface px-5 py-3">
+    <div class="flex items-center gap-2 border-b border-border bg-surface px-3 py-3 md:gap-3 md:px-5">
+
+      <button
+        (click)="close()"
+        class="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground md:hidden"
+        title="Back to conversations"
+      >
+        <svg appIcon="chevron-left" class="h-5 w-5"></svg>
+      </button>
 
       <div class="relative shrink-0">
         <div
@@ -38,14 +46,14 @@
       <div class="flex items-center gap-1">
 
         <button
-          class="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+          class="hidden h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground sm:grid"
           title="Call"
         >
           <svg appIcon="call" class="h-4 w-4"></svg>
         </button>
 
         <button
-          class="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+          class="hidden h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground sm:grid"
           title="Video call"
         >
           <svg appIcon="video" class="h-4 w-4"></svg>
@@ -53,7 +61,7 @@
 
         <button
           (click)="close()"
-          class="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+          class="hidden h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground md:grid"
           title="Close conversation"
         >
           <svg appIcon="close" class="h-4 w-4"></svg>
@@ -64,12 +72,12 @@
     </div>
 
     <!-- Messages -->
-    <div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+    <div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-4 md:px-5">
 
       @for (m of messages(); track m.id) {
 
         <div class="flex" [class]="isOwn(m) ? 'justify-end' : 'justify-start'">
-          <div class="max-w-[70%]">
+          <div class="max-w-[85%] sm:max-w-[70%]">
 
             @if (!isOwn(m) && c.isGroup) {
               <p class="mb-1 px-1 text-[10px] font-medium text-accent-400">{{ senderName(m) }}</p>
@@ -116,7 +124,7 @@
     </div>
 
     <!-- Composer -->
-    <div class="border-t border-border bg-surface px-4 py-3">
+    <div class="border-t border-border bg-surface px-3 py-3 md:px-4">
 
       <form (submit)="onEnter($event)" class="flex items-end gap-2">
 

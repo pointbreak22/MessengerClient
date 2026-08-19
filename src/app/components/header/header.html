@@ -2,10 +2,10 @@
   class="h-16 shrink-0 border-b border-border
          bg-surface"
 >
-  <div class="flex h-full items-center px-5">
+  <div class="flex h-full items-center px-3 md:px-5">
 
     <!-- Logo -->
-    <div class="flex w-[260px] shrink-0 items-center gap-3">
+    <div class="flex shrink-0 items-center gap-3 md:w-[260px]">
 
       <div
         class="flex h-9 w-9 items-center justify-center
@@ -16,13 +16,13 @@
         <svg appIcon="message" class="h-5 w-5 text-white"></svg>
       </div>
 
-      <span class="text-[15px] font-semibold tracking-tight">
+      <span class="hidden text-[15px] font-semibold tracking-tight sm:inline">
         Messenger
       </span>
     </div>
 
     <!-- Search -->
-    <div class="flex min-w-0 flex-1">
+    <div class="hidden min-w-0 flex-1 md:flex">
 
       <div class="relative w-full max-w-xl">
 
@@ -60,7 +60,7 @@
     </div>
 
     <!-- Right actions -->
-    <div class="ml-6 flex items-center gap-2">
+    <div class="ml-auto flex items-center gap-2 md:ml-6">
 
       <!-- Notifications -->
       <button

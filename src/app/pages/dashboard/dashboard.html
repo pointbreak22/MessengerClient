@@ -6,7 +6,11 @@
 
     <app-left-sidebar />
 
-    <main class="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface-alt">
+    <main
+      class="min-w-0 flex-1 flex-col overflow-hidden bg-surface-alt
+             md:flex
+             {{ selectedChat() ? 'flex' : 'hidden' }}"
+    >
       @if (selectedChat()) {
         <app-chat />
       } @else {

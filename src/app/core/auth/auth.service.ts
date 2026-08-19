@@ -20,14 +20,6 @@ export class AuthService {
   readonly isAuthenticated = computed(() => this._currentAccount() !== null);
 
   constructor() {
-    // Covers plain page reloads: MSAL restores the active account from
-    // localStorage synchronously (see _currentAccount's initializer above),
-    // but that path never emits LOGIN_SUCCESS, so the subscription below
-    // alone would leave currentUserProfile null until the next interactive login.
-    if (this._currentAccount()) {
-      void this.loadCurrentUserProfile();
-    }
-
     this.broadcast.msalSubject$
       .pipe(
         filter((msg) => msg.eventType === EventType.LOGIN_SUCCESS) // 👈 Убрали ACQUIRE_TOKEN_SUCCESS
@@ -45,6 +37,23 @@ export class AuthService {
           void this.loadCurrentUserProfile();
         }
       });
+  }
+
+  // Called once from app.config.ts's app initializer, after AuthService itself
+  // is fully constructed and returned — never from within AuthService's own
+  // constructor. Doing it there (even deferred via queueMicrotask) still hit
+  // NG0200 "circular dependency": the HTTP call it triggers runs through
+  // apiAuthInterceptor, which injects AuthService again, and something in that
+  // chain was still resolving on the same injector record. Calling this from a
+  // separate, later async initializer step sidesteps that entirely.
+  // Covers plain page reloads: MSAL restores the active account from
+  // localStorage synchronously (see _currentAccount's initializer above), but
+  // that path never emits LOGIN_SUCCESS, so the broadcast subscription alone
+  // would leave currentUserProfile null until the next interactive login.
+  async initializeSession(): Promise<void> {
+    if (this._currentAccount()) {
+      await this.loadCurrentUserProfile();
+    }
   }
 
   login(): void {
