@@ -4,7 +4,7 @@ import {AccountInfo, AuthenticationResult, EventType} from '@azure/msal-browser'
 import { filter, firstValueFrom } from 'rxjs';
 import { UserApiService } from '../../services/user-api.service';
 import { UserProfile } from '../../interfaces/user-profile';
-import { apiScope } from './msal.config';
+import {apiScope, msalConfig} from './msal.config';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
