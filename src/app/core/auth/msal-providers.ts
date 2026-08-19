@@ -29,11 +29,13 @@ function msalInterceptorConfigFactory(): MsalInterceptorConfiguration {
 
   const rawUrl = environment.apiBaseUrl.trim();
   const urlWithSlash = rawUrl.endsWith('/') ? rawUrl : `${rawUrl}/`;
-  const urlWithoutSlash = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
 
-  // Скоупы указываются прямо здесь
-  protectedResourceMap.set(urlWithSlash, [apiScope]);
-  protectedResourceMap.set(urlWithoutSlash, [apiScope]);
+  // strictMatching (default in @azure/msal-angular v6) anchors the pathname match
+  // (^...$), so a bare "/api/" key only matches the literal path "/api/" — every
+  // real endpoint like "/api/chats/me" was falling through unmatched, meaning the
+  // interceptor decided no scopes applied and forwarded requests with no
+  // Authorization header at all. The trailing "*" is required for prefix matching.
+  protectedResourceMap.set(`${urlWithSlash}*`, [apiScope]);
 
   return {
     interactionType: InteractionType.Redirect,
