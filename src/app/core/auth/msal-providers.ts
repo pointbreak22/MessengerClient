@@ -1,16 +1,6 @@
-import {
-  MSAL_GUARD_CONFIG,
-  MSAL_INSTANCE,
-  MSAL_INTERCEPTOR_CONFIG,
-  MsalBroadcastService,
-  MsalGuard,
-  MsalGuardConfiguration,
-  MsalInterceptorConfiguration,
-  MsalService,
-} from '@azure/msal-angular';
+import { MSAL_GUARD_CONFIG, MSAL_INSTANCE, MsalBroadcastService, MsalGuard, MsalGuardConfiguration, MsalService } from '@azure/msal-angular';
 import { InteractionType, IPublicClientApplication, PublicClientApplication } from '@azure/msal-browser';
 import { Provider } from '@angular/core';
-import { environment } from '../../../environments/environment';
 import { apiScope, msalConfig } from './msal.config';
 
 function msalInstanceFactory(): IPublicClientApplication {
@@ -24,31 +14,13 @@ function msalGuardConfigFactory(): MsalGuardConfiguration {
   };
 }
 
-function msalInterceptorConfigFactory(): MsalInterceptorConfiguration {
-  const protectedResourceMap = new Map<string, Array<string> | null>();
-
-  const rawUrl = environment.apiBaseUrl.trim();
-  const urlWithSlash = rawUrl.endsWith('/') ? rawUrl : `${rawUrl}/`;
-
-  // strictMatching (default in @azure/msal-angular v6) anchors the pathname match
-  // (^...$), so a bare "/api/" key only matches the literal path "/api/" — every
-  // real endpoint like "/api/chats/me" was falling through unmatched, meaning the
-  // interceptor decided no scopes applied and forwarded requests with no
-  // Authorization header at all. The trailing "*" is required for prefix matching.
-  protectedResourceMap.set(`${urlWithSlash}*`, [apiScope]);
-
-  return {
-    interactionType: InteractionType.Redirect,
-    protectedResourceMap,
-  };
-}
-
 // Registered in app.config.ts. Backed by the real Entra External ID (CIAM)
-// App Registration values in msal.config.ts.
+// App Registration values in msal.config.ts. REST auth headers are attached by our
+// own apiAuthInterceptor (core/http/api-auth.interceptor.ts), not MsalInterceptor —
+// see that file for why.
 export const msalProviders: Provider[] = [
   { provide: MSAL_INSTANCE, useFactory: msalInstanceFactory },
   { provide: MSAL_GUARD_CONFIG, useFactory: msalGuardConfigFactory },
-  { provide: MSAL_INTERCEPTOR_CONFIG, useFactory: msalInterceptorConfigFactory },
   MsalService,
   MsalGuard,
   MsalBroadcastService,
