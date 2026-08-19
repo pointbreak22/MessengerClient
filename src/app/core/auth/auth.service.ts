@@ -66,13 +66,18 @@ export class AuthService {
 
     if (!account) return null;
 
-    // Подстраховка: убеждаемся, что MSAL считает этот аккаунт активным
     if (!this.msal.instance.getActiveAccount()) {
       this.msal.instance.setActiveAccount(account);
     }
 
     try {
-      const result = await firstValueFrom(this.msal.acquireTokenSilent({ scopes, account }));
+      const result = await firstValueFrom(
+        this.msal.acquireTokenSilent({
+          scopes,
+          account,
+          authority: msalConfig.auth.authority // 👈 Исключаем mismatch
+        })
+      );
       return result.accessToken;
     } catch (err) {
       console.warn('MSAL silent token acquisition failed:', err);
