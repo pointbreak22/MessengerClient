@@ -49,13 +49,26 @@ export class AuthService {
   // (server/config issue, not just an expired cache entry) — every failing request
   // fired its own redirect. Re-auth is now only ever user-initiated via login().
   async getAccessToken(scopes: string[] = [apiScope]): Promise<string | null> {
-    const account = this._currentAccount();
+    // 1. Пытаемся взять аккаунт из сигнала или напрямую из хранилища MSAL
+    let account = this._currentAccount();
+
+    if (!account) {
+      const accounts = this.msal.instance.getAllAccounts();
+      if (accounts.length > 0) {
+        account = accounts[0];
+        // Подстраховка: актуализируем ваш сигнал/состояние
+        this._currentAccount.set(account);
+      }
+    }
+
+    // Если аккаунта действительно нет вовсе — отдаем null
     if (!account) return null;
 
     try {
       const result = await firstValueFrom(this.msal.acquireTokenSilent({ scopes, account }));
       return result.accessToken;
-    } catch {
+    } catch (err) {
+      console.warn('MSAL silent token acquisition failed:', err);
       return null;
     }
   }

@@ -12,10 +12,19 @@ import { AuthService } from '../auth/auth.service';
 // AuthService can get one silently, and otherwise just forwards the request as-is —
 // the backend 401s it and the app stays in a stable, non-looping state instead.
 export const apiAuthInterceptor: HttpInterceptorFn = (req, next) => {
-  if (!req.url.startsWith(environment.apiBaseUrl)) return next(req);
+  const baseUrl = environment.apiBaseUrl.replace(/\/$/, '');
+
+  if (!req.url.startsWith(baseUrl)) {
+    return next(req);
+  }
 
   const auth = inject(AuthService);
   return from(auth.getAccessToken()).pipe(
-    switchMap((token) => next(token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req)),
+    switchMap((token) => {
+      const authReq = token
+        ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
+        : req;
+      return next(authReq);
+    }),
   );
 };
