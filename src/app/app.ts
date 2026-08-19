@@ -8,11 +8,7 @@ import {MsalService} from '@azure/msal-angular';
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
-export class App implements OnInit {
-  private msalService = inject(MsalService);
+export class App  {
 
-  ngOnInit(): void {
-    // Обязательно для MSAL: обрабатывает ответ от Entra ID после редиректа
-    this.msalService.handleRedirectObservable().subscribe();
-  }
+
 }

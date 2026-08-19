@@ -3,10 +3,10 @@ import { Configuration, LogLevel } from '@azure/msal-browser';
 export const msalConfig: Configuration = {
   auth: {
     clientId: 'e3125d24-62d4-403d-94f8-7c4a78040a02',
-    authority: 'https://messengerpointbreak22.ciamlogin.com/57a5831e-59a5-4fd7-941e-47ce69ea69d0',
-    knownAuthorities: ['messengerpointbreak22.ciamlogin.com'],
+    // Переводим authority на GUID-домен c /v2.0
+    authority: 'https://57a5831e-59a5-4fd7-941e-47ce69ea69d0.ciamlogin.com/57a5831e-59a5-4fd7-941e-47ce69ea69d0/v2.0',
+    knownAuthorities: ['57a5831e-59a5-4fd7-941e-47ce69ea69d0.ciamlogin.com'],
 
-    // Динамический Origin для работы и на localhost, и в Azure:
     redirectUri: typeof window !== 'undefined' ? window.location.origin : '/',
     postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin : '/',
   },
@@ -14,9 +14,6 @@ export const msalConfig: Configuration = {
     cacheLocation: 'localStorage',
   },
   system: {
-    // MsalGuard swallows every internal MSAL error into a bare `catchError(() => of(false))`
-    // and only reports it through this logger — without a callback wired up, auth failures
-    // (bad authority, network, config) fail the guard completely silently, no console output.
     loggerOptions: {
       loggerCallback: (level, message) => {
         if (level === LogLevel.Error) console.error(message);

@@ -14,7 +14,10 @@ import { AuthService } from '../auth/auth.service';
 export const apiAuthInterceptor: HttpInterceptorFn = (req, next) => {
   const baseUrl = environment.apiBaseUrl.replace(/\/$/, '');
 
-  if (!req.url.startsWith(baseUrl)) {
+  // Проверяем, идет ли запрос на наш API (учитывая и относительные, и абсолютные URL)
+  const isApiRequest = req.url.startsWith(baseUrl) || req.url.startsWith('/api');
+
+  if (!isApiRequest) {
     return next(req);
   }
 

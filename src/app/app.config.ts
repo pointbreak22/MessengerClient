@@ -20,7 +20,13 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(async () => {
       const msal = inject(MsalService);
       await msal.instance.initialize();
-      msal.handleRedirectObservable().subscribe(); // Запускаем подписку без await
+      msal.handleRedirectObservable().subscribe((result) => {
+        if (result?.account) {
+          msal.instance.setActiveAccount(result.account);
+        } else if (msal.instance.getAllAccounts().length > 0) {
+          msal.instance.setActiveAccount(msal.instance.getAllAccounts()[0]);
+        }
+      }); // Запускаем подписку без await
     }),
   ]
 };

@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { MsalBroadcastService, MsalService } from '@azure/msal-angular';
-import { AccountInfo, EventType } from '@azure/msal-browser';
+import {AccountInfo, AuthenticationResult, EventType} from '@azure/msal-browser';
 import { filter, firstValueFrom } from 'rxjs';
 import { UserApiService } from '../../services/user-api.service';
 import { UserProfile } from '../../interfaces/user-profile';
@@ -22,15 +22,20 @@ export class AuthService {
   constructor() {
     this.broadcast.msalSubject$
       .pipe(
-        filter(
-          (msg) => msg.eventType === EventType.LOGIN_SUCCESS || msg.eventType === EventType.ACQUIRE_TOKEN_SUCCESS,
-        ),
+        filter((msg) => msg.eventType === EventType.LOGIN_SUCCESS) // 👈 Убрали ACQUIRE_TOKEN_SUCCESS
       )
-      .subscribe(() => {
-        const active = this.msal.instance.getActiveAccount() ?? this.msal.instance.getAllAccounts()[0] ?? null;
-        if (active) this.msal.instance.setActiveAccount(active);
-        this._currentAccount.set(active);
-        if (active) void this.loadCurrentUserProfile();
+      .subscribe((msg) => {
+        const payloadAccount = (msg.payload as AuthenticationResult)?.account;
+        const active = payloadAccount
+          ?? this.msal.instance.getActiveAccount()
+          ?? this.msal.instance.getAllAccounts()[0]
+          ?? null;
+
+        if (active) {
+          this.msal.instance.setActiveAccount(active);
+          this._currentAccount.set(active);
+          void this.loadCurrentUserProfile();
+        }
       });
   }
 
@@ -49,20 +54,22 @@ export class AuthService {
   // (server/config issue, not just an expired cache entry) — every failing request
   // fired its own redirect. Re-auth is now only ever user-initiated via login().
   async getAccessToken(scopes: string[] = [apiScope]): Promise<string | null> {
-    // 1. Пытаемся взять аккаунт из сигнала или напрямую из хранилища MSAL
     let account = this._currentAccount();
 
     if (!account) {
       const accounts = this.msal.instance.getAllAccounts();
       if (accounts.length > 0) {
         account = accounts[0];
-        // Подстраховка: актуализируем ваш сигнал/состояние
         this._currentAccount.set(account);
       }
     }
 
-    // Если аккаунта действительно нет вовсе — отдаем null
     if (!account) return null;
+
+    // Подстраховка: убеждаемся, что MSAL считает этот аккаунт активным
+    if (!this.msal.instance.getActiveAccount()) {
+      this.msal.instance.setActiveAccount(account);
+    }
 
     try {
       const result = await firstValueFrom(this.msal.acquireTokenSilent({ scopes, account }));
@@ -74,7 +81,14 @@ export class AuthService {
   }
 
   private async loadCurrentUserProfile(): Promise<void> {
-    const profile = await firstValueFrom(this.userApi.getMe());
-    this._currentUserProfile.set(profile);
+    // Защита от повторного вызова, если профиль уже загружен
+    if (this._currentUserProfile()) return;
+
+    try {
+      const profile = await firstValueFrom(this.userApi.getMe());
+      this._currentUserProfile.set(profile);
+    } catch (err) {
+      console.error('Failed to load user profile:', err);
+    }
   }
 }
