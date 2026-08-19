@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { MsalBroadcastService, MsalService } from '@azure/msal-angular';
-import { AccountInfo, EventType } from '@azure/msal-browser';
+import { AccountInfo, EventType, InteractionRequiredAuthError } from '@azure/msal-browser';
 import { filter, firstValueFrom } from 'rxjs';
 import { UserApiService } from '../../services/user-api.service';
 import { UserProfile } from '../../interfaces/user-profile';
@@ -14,6 +14,7 @@ export class AuthService {
 
   private readonly _currentAccount = signal<AccountInfo | null>(this.msal.instance.getActiveAccount());
   private readonly _currentUserProfile = signal<UserProfile | null>(null);
+  private reauthenticating = false;
 
   readonly currentAccount = this._currentAccount.asReadonly();
   readonly currentUserProfile = this._currentUserProfile.asReadonly();
@@ -50,9 +51,22 @@ export class AuthService {
     try {
       const result = await firstValueFrom(this.msal.acquireTokenSilent({ scopes, account }));
       return result.accessToken;
-    } catch {
+    } catch (error) {
+      // Refresh token expired/revoked and silent renewal can't recover on its own
+      // (e.g. SignalR's accessTokenFactory has no other fallback) — re-auth interactively.
+      if (error instanceof InteractionRequiredAuthError) this.reauthenticate(scopes);
       return null;
     }
+  }
+
+  // Forces a fresh interactive sign-in when silent token acquisition can't recover
+  // (expired session) or the API itself rejects an ostensibly-valid token as 401.
+  // Guarded because acquireTokenRedirect navigates away — no need to reset the flag,
+  // the page reload clears it.
+  reauthenticate(scopes: string[] = [apiScope]): void {
+    if (this.reauthenticating) return;
+    this.reauthenticating = true;
+    this.msal.acquireTokenRedirect({ scopes });
   }
 
   private async loadCurrentUserProfile(): Promise<void> {
