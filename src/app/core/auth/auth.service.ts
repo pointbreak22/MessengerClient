@@ -20,6 +20,14 @@ export class AuthService {
   readonly isAuthenticated = computed(() => this._currentAccount() !== null);
 
   constructor() {
+    // Covers plain page reloads: MSAL restores the active account from
+    // localStorage synchronously (see _currentAccount's initializer above),
+    // but that path never emits LOGIN_SUCCESS, so the subscription below
+    // alone would leave currentUserProfile null until the next interactive login.
+    if (this._currentAccount()) {
+      void this.loadCurrentUserProfile();
+    }
+
     this.broadcast.msalSubject$
       .pipe(
         filter((msg) => msg.eventType === EventType.LOGIN_SUCCESS) // 👈 Убрали ACQUIRE_TOKEN_SUCCESS
