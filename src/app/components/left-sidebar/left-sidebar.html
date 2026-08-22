@@ -338,6 +338,17 @@
           >
             <svg appIcon="message" class="h-4 w-4"></svg>
           </button>
+
+          <button
+            (click)="removeFriend(friend.id)"
+            title="Remove friend"
+            class="shrink-0 rounded-lg p-2 text-faint-foreground
+                   opacity-0 transition
+                   hover:bg-surface-hover hover:text-foreground
+                   group-hover:opacity-100"
+          >
+            <svg appIcon="close" class="h-4 w-4"></svg>
+          </button>
         </div>
       } @empty {
         <p class="px-3 py-6 text-center text-xs text-faint-foreground">No friends found</p>

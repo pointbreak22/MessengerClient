@@ -126,4 +126,8 @@ export class LeftSidebar {
   declineRequest(fromUserId: string): void {
     void this.userStore.removeFriend(fromUserId);
   }
+
+  removeFriend(friendId: string): void {
+    void this.userStore.removeFriend(friendId);
+  }
 }

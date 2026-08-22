@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../core/auth/auth.service';
 import { ChatHubService } from '../core/signalr/chat-hub.service';
 import { UserApiService } from '../services/user-api.service';
 import { FriendRequest } from '../interfaces/friend-request';
@@ -10,6 +11,7 @@ import { UserProfile } from '../interfaces/user-profile';
 export class UserStore {
   private readonly api = inject(UserApiService);
   private readonly hub = inject(ChatHubService);
+  private readonly auth = inject(AuthService);
 
   private readonly _friends = signal<UserProfile[]>([]);
   private readonly _incomingRequests = signal<FriendRequest[]>([]);
@@ -32,6 +34,10 @@ export class UserStore {
     this.hub.on<string>('UserWentOnline', (userId) => this.setPresence(userId, true));
     this.hub.on<string>('UserWentOffline', (userId) => this.setPresence(userId, false));
     this.hub.on<FriendRequestAcceptedEvent>('FriendRequestAccepted', (event) => void this.addFriend(event.by));
+    // Backend sends this on POST /friends/{friendId}, but its payload shape
+    // isn't confirmed — refetching ignores whatever it carries and just picks
+    // up the new pending request, same as ChatStore refetching on AddedToGroup.
+    this.hub.on<unknown>('FriendRequest', () => void this.loadFriendRequests());
   }
 
   async loadFriends(): Promise<void> {
@@ -62,7 +68,8 @@ export class UserStore {
       return;
     }
     const result = await firstValueFrom(this.api.getUsers({ search, pageSize: 20 }));
-    this._searchResults.set(result.items);
+    const myId = this.auth.currentUserProfile()?.id;
+    this._searchResults.set(result.items.filter((u) => u.id !== myId));
   }
 
   clearSearchResults(): void {
@@ -70,6 +77,14 @@ export class UserStore {
   }
 
   async sendFriendRequest(friendId: string): Promise<void> {
+    // They already sent us a pending request — the backend would just return
+    // that existing Pending row as-is (idempotent, not an auto-accept), which
+    // looks like nothing happened. Treat "add" on someone who already asked
+    // us as accepting instead, so mutual interest becomes friendship right away.
+    if (this._incomingRequests().some((r) => r.fromUserId === friendId)) {
+      await this.acceptFriendRequest(friendId);
+      return;
+    }
     await firstValueFrom(this.api.sendFriendRequest(friendId));
     this._sentRequestIds.update((ids) => new Set(ids).add(friendId));
   }
