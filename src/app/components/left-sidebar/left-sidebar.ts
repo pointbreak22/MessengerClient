@@ -17,6 +17,8 @@ export class LeftSidebar {
   private readonly chatStore = inject(ChatStore);
   private readonly userStore = inject(UserStore);
 
+  private searchDebounce?: ReturnType<typeof setTimeout>;
+
   protected readonly tab = signal<Tab>('chats');
   protected readonly query = signal('');
 
@@ -25,6 +27,10 @@ export class LeftSidebar {
   protected readonly friends = this.userStore.friends;
   protected readonly selectedChatId = this.chatStore.selectedChatId;
   protected readonly directCounterparts = this.chatStore.directCounterparts;
+  protected readonly incomingRequests = this.userStore.incomingRequests;
+  protected readonly requestSenders = this.userStore.requestSenders;
+  protected readonly searchResults = this.userStore.searchResults;
+  protected readonly sentRequestIds = this.userStore.sentRequestIds;
 
   protected readonly getInitials = getInitials;
   protected readonly formatLastSeen = formatLastSeen;
@@ -38,6 +44,9 @@ export class LeftSidebar {
   protected readonly filteredFriends = computed(() =>
     this.friends().filter((u) => u.userName.toLowerCase().includes(this.query().toLowerCase())),
   );
+  // Typing on the Friends tab searches all people (backend), not just your
+  // existing friends — this flips the tab's list over to searchResults().
+  protected readonly friendsSearchActive = computed(() => this.tab() === 'friends' && this.query().trim().length > 0);
 
   protected readonly count = computed(() => {
     switch (this.tab()) {
@@ -64,10 +73,26 @@ export class LeftSidebar {
 
   setTab(tab: Tab): void {
     this.tab.set(tab);
+    if (tab === 'friends') {
+      void this.userStore.loadFriendRequests();
+      if (this.query().trim()) {
+        void this.userStore.searchUsers(this.query());
+      }
+    }
   }
 
   onQueryInput(event: Event): void {
-    this.query.set((event.target as HTMLInputElement).value);
+    const value = (event.target as HTMLInputElement).value;
+    this.query.set(value);
+
+    if (this.tab() !== 'friends') return;
+
+    clearTimeout(this.searchDebounce);
+    if (!value.trim()) {
+      this.userStore.clearSearchResults();
+      return;
+    }
+    this.searchDebounce = setTimeout(() => void this.userStore.searchUsers(value), 300);
   }
 
   selectChat(id: string): void {
@@ -76,5 +101,29 @@ export class LeftSidebar {
 
   messageFriend(userId: string): void {
     void this.chatStore.createDirectChat(userId);
+  }
+
+  isFriend(userId: string): boolean {
+    return this.friends().some((f) => f.id === userId);
+  }
+
+  isPending(userId: string): boolean {
+    return this.sentRequestIds().has(userId);
+  }
+
+  requestSenderName(fromUserId: string): string {
+    return this.requestSenders()[fromUserId]?.userName ?? '';
+  }
+
+  sendFriendRequest(userId: string): void {
+    void this.userStore.sendFriendRequest(userId);
+  }
+
+  acceptRequest(fromUserId: string): void {
+    void this.userStore.acceptFriendRequest(fromUserId);
+  }
+
+  declineRequest(fromUserId: string): void {
+    void this.userStore.removeFriend(fromUserId);
   }
 }

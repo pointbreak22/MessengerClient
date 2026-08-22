@@ -26,6 +26,7 @@ export class Dashboard implements OnDestroy {
     void this.hub.connect();
     void this.chatStore.loadChats();
     void this.userStore.loadFriends();
+    void this.userStore.loadFriendRequests();
   }
 
   ngOnDestroy(): void {
