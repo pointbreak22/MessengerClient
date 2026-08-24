@@ -1,4 +1,5 @@
 import { Component, OnDestroy, inject } from '@angular/core';
+import { CallOverlay } from '../../components/call-overlay/call-overlay';
 import { Header } from '../../components/header/header';
 import { Icon } from '../../components/icon/icon';
 import { LeftSidebar } from '../../components/left-sidebar/left-sidebar';
@@ -10,7 +11,7 @@ import { Chat } from '../chat/chat';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [Header, LeftSidebar, RightSidebar, Chat, Icon],
+  imports: [Header, LeftSidebar, RightSidebar, Chat, Icon, CallOverlay],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css',
 })

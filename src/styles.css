@@ -28,4 +28,6 @@
 
   /* status */
   --color-online: #22c55e;
+  --color-danger: #ef4444;
+  --color-danger-600: #dc2626;
 }

@@ -1,0 +1,126 @@
+@if (call.state() !== 'idle') {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+
+    @if (call.state() === 'incoming' || call.state() === 'outgoing') {
+
+      <!-- Ringing / dialing card -->
+      <div class="w-full max-w-xs rounded-2xl border border-border bg-surface p-6 text-center shadow-2xl">
+
+        <div
+          class="mx-auto flex h-20 w-20 items-center justify-center
+                 rounded-full bg-gradient-to-br
+                 from-accent-500/30 to-accent2-500/30
+                 text-xl font-semibold text-accent-400
+                 ring-4 ring-accent-500/5"
+        >
+          {{ getInitials(call.remoteProfile()?.userName) }}
+        </div>
+
+        <h3 class="mt-4 text-sm font-semibold text-foreground">
+          {{ call.remoteProfile()?.userName ?? '...' }}
+        </h3>
+
+        <p class="mt-1 text-xs text-muted-foreground">
+          @if (call.state() === 'incoming') {
+            Incoming {{ call.isVideo() ? 'video ' : '' }}call
+          } @else {
+            Calling{{ call.isVideo() ? ' (video)' : '' }}...
+          }
+        </p>
+
+        @if (call.errorMessage()) {
+          <p class="mt-2 text-xs text-danger">{{ call.errorMessage() }}</p>
+        }
+
+        <div class="mt-6 flex items-center justify-center gap-3">
+          @if (call.state() === 'incoming') {
+            <button
+              (click)="accept()"
+              title="Accept"
+              class="flex h-12 w-12 items-center justify-center rounded-full bg-online text-white transition hover:opacity-90"
+            >
+              <svg appIcon="call" class="h-5 w-5"></svg>
+            </button>
+          }
+          <button
+            (click)="decline()"
+            title="Decline"
+            class="flex h-12 w-12 items-center justify-center rounded-full bg-danger text-white transition hover:bg-danger-600"
+          >
+            <svg appIcon="phone-off" class="h-5 w-5"></svg>
+          </button>
+        </div>
+
+      </div>
+
+    } @else {
+
+      <!-- Connected call -->
+      <div class="relative flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-surface">
+
+        @if (call.isVideo()) {
+          <div class="relative min-h-0 flex-1 bg-black">
+            <video
+              [srcObject]="call.remoteMediaStream()"
+              autoplay
+              playsinline
+              class="h-full w-full object-contain"
+            ></video>
+            <video
+              [srcObject]="call.localMediaStream()"
+              autoplay
+              playsinline
+              muted
+              class="absolute bottom-4 right-4 h-28 w-20 rounded-lg border border-border-strong object-cover shadow-lg sm:h-36 sm:w-24"
+            ></video>
+          </div>
+        } @else {
+          <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
+            <div
+              class="flex h-24 w-24 items-center justify-center
+                     rounded-full bg-gradient-to-br
+                     from-accent-500/30 to-accent2-500/30
+                     text-2xl font-semibold text-accent-400
+                     ring-4 ring-accent-500/5"
+            >
+              {{ getInitials(call.remoteProfile()?.userName) }}
+            </div>
+            <h3 class="text-sm font-semibold text-foreground">{{ call.remoteProfile()?.userName }}</h3>
+            <p class="text-xs text-online">Connected</p>
+          </div>
+        }
+
+        <div class="flex items-center justify-center gap-3 border-t border-border bg-surface p-4">
+          <button
+            (click)="toggleMute()"
+            title="{{ call.muted() ? 'Unmute' : 'Mute' }}"
+            class="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground transition hover:bg-surface-hover"
+          >
+            <svg [appIcon]="call.muted() ? 'mic-off' : 'mic'" class="h-4 w-4"></svg>
+          </button>
+
+          @if (call.isVideo()) {
+            <button
+              (click)="toggleCamera()"
+              title="{{ call.cameraOff() ? 'Turn camera on' : 'Turn camera off' }}"
+              class="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground transition hover:bg-surface-hover"
+            >
+              <svg [appIcon]="call.cameraOff() ? 'video-off' : 'video'" class="h-4 w-4"></svg>
+            </button>
+          }
+
+          <button
+            (click)="hangUp()"
+            title="Hang up"
+            class="flex h-11 w-11 items-center justify-center rounded-full bg-danger text-white transition hover:bg-danger-600"
+          >
+            <svg appIcon="phone-off" class="h-4 w-4"></svg>
+          </button>
+        </div>
+
+      </div>
+
+    }
+
+  </div>
+}

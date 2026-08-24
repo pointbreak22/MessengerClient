@@ -7,6 +7,12 @@ import { AuthService } from '../auth/auth.service';
 export class ChatHubService {
   private readonly auth = inject(AuthService);
   private connection: HubConnection | null = null;
+  // Stores/services register listeners in their constructors, which can run
+  // before Dashboard calls connect() (e.g. ChatStore/UserStore are injected
+  // by Dashboard's own field initializers, ahead of the connect() call in its
+  // constructor body) — on() used to silently drop those via `this.connection?.on`.
+  // Queue them here and replay onto the real connection once one exists.
+  private readonly pendingHandlers: { methodName: string; callback: (payload: unknown) => void }[] = [];
 
   readonly connectionState = signal<HubConnectionState>(HubConnectionState.Disconnected);
 
@@ -24,6 +30,11 @@ export class ChatHubService {
     connection.onreconnected(() => this.connectionState.set(HubConnectionState.Connected));
     connection.onclose(() => this.connectionState.set(HubConnectionState.Disconnected));
 
+    for (const { methodName, callback } of this.pendingHandlers) {
+      connection.on(methodName, callback);
+    }
+    this.pendingHandlers.length = 0;
+
     this.connection = connection;
     await connection.start();
     this.connectionState.set(HubConnectionState.Connected);
@@ -36,7 +47,11 @@ export class ChatHubService {
   }
 
   on<T>(methodName: string, callback: (payload: T) => void): void {
-    this.connection?.on(methodName, callback);
+    if (this.connection) {
+      this.connection.on(methodName, callback as (payload: unknown) => void);
+    } else {
+      this.pendingHandlers.push({ methodName, callback: callback as (payload: unknown) => void });
+    }
   }
 
   invoke<T>(methodName: string, ...args: unknown[]): Promise<T> {

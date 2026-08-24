@@ -55,27 +55,35 @@
               : (selectedChatContact()?.lastSeenAt ? formatLastSeen(selectedChatContact()!.lastSeenAt) : '')) }}
       </p>
 
-      <div class="mt-4 flex gap-2">
+      @if (!chat.isGroup) {
+        <div class="mt-4 flex gap-2">
 
-        <button
-          class="flex h-9 w-9 items-center justify-center
-                 rounded-xl border border-border
-                 bg-surface-alt text-faint-foreground
-                 hover:bg-surface-hover hover:text-muted-foreground"
-        >
-          <svg appIcon="call" class="h-4 w-4"></svg>
-        </button>
+          <button
+            (click)="startCall(false)"
+            [disabled]="call.state() !== 'idle'"
+            class="flex h-9 w-9 items-center justify-center
+                   rounded-xl border border-border
+                   bg-surface-alt text-faint-foreground
+                   hover:bg-surface-hover hover:text-muted-foreground
+                   disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <svg appIcon="call" class="h-4 w-4"></svg>
+          </button>
 
-        <button
-          class="flex h-9 w-9 items-center justify-center
-                 rounded-xl border border-border
-                 bg-surface-alt text-faint-foreground
-                 hover:bg-surface-hover hover:text-muted-foreground"
-        >
-          <svg appIcon="video" class="h-4 w-4"></svg>
-        </button>
+          <button
+            (click)="startCall(true)"
+            [disabled]="call.state() !== 'idle'"
+            class="flex h-9 w-9 items-center justify-center
+                   rounded-xl border border-border
+                   bg-surface-alt text-faint-foreground
+                   hover:bg-surface-hover hover:text-muted-foreground
+                   disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <svg appIcon="video" class="h-4 w-4"></svg>
+          </button>
 
-      </div>
+        </div>
+      }
 
     </div>
 
@@ -133,15 +141,35 @@
       <!-- Shared media -->
       <section class="mt-6">
 
-        <div class="mb-3 flex items-center justify-between px-1">
-          <p class="text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">Shared media</p>
-          <button class="text-[10px] text-accent-400 hover:text-accent-500">View all</button>
-        </div>
+        <p class="mb-3 px-1 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+          Shared media — {{ sharedMedia().length }}
+        </p>
 
         <div class="grid grid-cols-3 gap-1.5">
-          <div class="aspect-square rounded-lg bg-gradient-to-br from-accent-500/20 to-surface-alt"></div>
-          <div class="aspect-square rounded-lg bg-gradient-to-br from-accent2-500/20 to-surface-alt"></div>
-          <div class="aspect-square rounded-lg bg-gradient-to-br from-accent-600/20 to-surface-alt"></div>
+          @for (m of sharedMedia(); track m.id) {
+            <a
+              [href]="m.attachmentUrl"
+              target="_blank"
+              rel="noopener"
+              class="group relative aspect-square overflow-hidden rounded-lg bg-surface-alt"
+            >
+              @if (isImageAttachment(m.attachmentUrl!)) {
+                <img
+                  [src]="m.attachmentUrl"
+                  alt=""
+                  class="h-full w-full object-cover transition group-hover:opacity-80"
+                />
+              } @else {
+                <div class="flex h-full w-full flex-col items-center justify-center gap-1 text-faint-foreground transition group-hover:text-muted-foreground">
+                  <svg appIcon="attach" class="h-5 w-5"></svg>
+                </div>
+              }
+            </a>
+          } @empty {
+            <p class="col-span-3 px-1 py-3 text-center text-[11px] text-faint-foreground">
+              No shared files yet
+            </p>
+          }
         </div>
 
       </section>

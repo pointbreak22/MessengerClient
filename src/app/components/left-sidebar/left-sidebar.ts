@@ -21,6 +21,9 @@ export class LeftSidebar {
 
   protected readonly tab = signal<Tab>('chats');
   protected readonly query = signal('');
+  protected readonly showCreateGroup = signal(false);
+  protected readonly groupName = signal('');
+  protected readonly selectedMemberIds = signal<ReadonlySet<string>>(new Set());
 
   protected readonly chats = this.chatStore.chats;
   protected readonly groups = this.chatStore.groups;
@@ -47,6 +50,9 @@ export class LeftSidebar {
   // Typing on the Friends tab searches all people (backend), not just your
   // existing friends — this flips the tab's list over to searchResults().
   protected readonly friendsSearchActive = computed(() => this.tab() === 'friends' && this.query().trim().length > 0);
+  protected readonly canCreateGroup = computed(
+    () => this.groupName().trim().length > 0 && this.selectedMemberIds().size > 0,
+  );
 
   protected readonly count = computed(() => {
     switch (this.tab()) {
@@ -129,5 +135,37 @@ export class LeftSidebar {
 
   removeFriend(friendId: string): void {
     void this.userStore.removeFriend(friendId);
+  }
+
+  toggleCreateGroup(): void {
+    const next = !this.showCreateGroup();
+    this.showCreateGroup.set(next);
+    if (!next) {
+      this.groupName.set('');
+      this.selectedMemberIds.set(new Set());
+    }
+  }
+
+  onGroupNameInput(event: Event): void {
+    this.groupName.set((event.target as HTMLInputElement).value);
+  }
+
+  isSelectedMember(userId: string): boolean {
+    return this.selectedMemberIds().has(userId);
+  }
+
+  toggleMember(userId: string): void {
+    this.selectedMemberIds.update((ids) => {
+      const next = new Set(ids);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+
+  async submitCreateGroup(): Promise<void> {
+    if (!this.canCreateGroup()) return;
+    await this.chatStore.createGroupChat(this.groupName().trim(), [...this.selectedMemberIds()]);
+    this.toggleCreateGroup();
   }
 }

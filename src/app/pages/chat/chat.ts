@@ -1,7 +1,10 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import { Icon } from '../../components/icon/icon';
 import { AuthService } from '../../core/auth/auth.service';
+import { CallService } from '../../core/signalr/call.service';
+import { AttachmentApiService } from '../../services/attachment-api.service';
 import { ChatStore } from '../../stores/chat.store';
 import { MessageStore } from '../../stores/message.store';
 import { ChatMessage } from '../../interfaces/chat-message';
@@ -17,6 +20,10 @@ export class Chat {
   private readonly auth = inject(AuthService);
   private readonly chatStore = inject(ChatStore);
   private readonly messageStore = inject(MessageStore);
+  private readonly attachmentApi = inject(AttachmentApiService);
+  protected readonly call = inject(CallService);
+
+  @ViewChild('fileInput') private readonly fileInput!: ElementRef<HTMLInputElement>;
 
   protected readonly chat = this.chatStore.selectedChat;
   protected readonly directCounterparts = this.chatStore.directCounterparts;
@@ -27,7 +34,15 @@ export class Chat {
     return chat ? this.messageStore.messagesFor(chat.id)() : [];
   });
 
+  // 1:1 only — a group call needs an SFU/media server, not just SignalR
+  // signaling, so calling is limited to direct chats for now.
+  protected readonly canCall = computed(() => {
+    const chat = this.chat();
+    return !!chat && !chat.isGroup && this.call.state() === 'idle';
+  });
+
   protected readonly draft = signal('');
+  protected readonly uploading = signal(false);
 
   protected readonly getInitials = getInitials;
   protected readonly formatLastSeen = formatLastSeen;
@@ -71,5 +86,34 @@ export class Chat {
 
   close(): void {
     this.chatStore.closeChat();
+  }
+
+  startCall(video: boolean): void {
+    const chat = this.chat();
+    if (!chat || chat.isGroup) return;
+    const counterpartId = this.directCounterparts()[chat.id]?.id;
+    if (!counterpartId) return;
+    void this.call.startCall(counterpartId, chat.id, video);
+  }
+
+  triggerAttach(): void {
+    if (this.uploading()) return;
+    this.fileInput.nativeElement.click();
+  }
+
+  async onFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // allow re-selecting the same file next time
+    const chat = this.chat();
+    if (!file || !chat) return;
+
+    this.uploading.set(true);
+    try {
+      const { url } = await firstValueFrom(this.attachmentApi.upload(file));
+      await this.messageStore.sendMessage(chat.id, null, url);
+    } finally {
+      this.uploading.set(false);
+    }
   }
 }

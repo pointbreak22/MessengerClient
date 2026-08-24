@@ -45,19 +45,25 @@
 
       <div class="flex items-center gap-1">
 
-        <button
-          class="hidden h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground sm:grid"
-          title="Call"
-        >
-          <svg appIcon="call" class="h-4 w-4"></svg>
-        </button>
+        @if (!c.isGroup) {
+          <button
+            (click)="startCall(false)"
+            [disabled]="!canCall()"
+            class="hidden h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:grid"
+            title="Call"
+          >
+            <svg appIcon="call" class="h-4 w-4"></svg>
+          </button>
 
-        <button
-          class="hidden h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground sm:grid"
-          title="Video call"
-        >
-          <svg appIcon="video" class="h-4 w-4"></svg>
-        </button>
+          <button
+            (click)="startCall(true)"
+            [disabled]="!canCall()"
+            class="hidden h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:grid"
+            title="Video call"
+          >
+            <svg appIcon="video" class="h-4 w-4"></svg>
+          </button>
+        }
 
         <button
           (click)="close()"
@@ -128,9 +134,19 @@
 
       <form (submit)="onEnter($event)" class="flex items-end gap-2">
 
+        <input
+          #fileInput
+          type="file"
+          class="hidden"
+          accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,video/mp4"
+          (change)="onFileSelected($event)"
+        />
+
         <button
           type="button"
-          class="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+          (click)="triggerAttach()"
+          [disabled]="uploading()"
+          class="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
           title="Attach"
         >
           <svg appIcon="attach" class="h-[18px] w-[18px]"></svg>
