@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { MsalBroadcastService, MsalService } from '@azure/msal-angular';
-import {AccountInfo, AuthenticationResult, EventType} from '@azure/msal-browser';
+import {AccountInfo, AuthenticationResult, EventType, InteractionRequiredAuthError} from '@azure/msal-browser';
 import { filter, firstValueFrom } from 'rxjs';
 import { UserApiService } from '../../services/user-api.service';
 import { UserProfile } from '../../interfaces/user-profile';
@@ -14,6 +14,10 @@ export class AuthService {
 
   private readonly _currentAccount = signal<AccountInfo | null>(this.msal.instance.getActiveAccount());
   private readonly _currentUserProfile = signal<UserProfile | null>(null);
+  // Guards against re-triggering loginRedirect() from every in-flight request
+  // that hits the same dead session — without this, N concurrent 401s would
+  // each independently call login() and race each other into the redirect.
+  private reauthTriggered = false;
 
   readonly currentAccount = this._currentAccount.asReadonly();
   readonly currentUserProfile = this._currentUserProfile.asReadonly();
@@ -65,11 +69,17 @@ export class AuthService {
     this.msal.logoutRedirect().subscribe();
   }
 
-  // Silent-only: returns null on any failure instead of forcing an interactive
-  // redirect. Auto-triggering acquireTokenRedirect from here caused a login-window
-  // reload loop when silent renewal was failing for a real, unrecoverable reason
-  // (server/config issue, not just an expired cache entry) — every failing request
-  // fired its own redirect. Re-auth is now only ever user-initiated via login().
+  // Silent-first: most failures (server/config issues, transient network
+  // errors) just return null instead of forcing an interactive redirect —
+  // auto-triggering acquireTokenRedirect for *those* caused a login-window
+  // reload loop, since every failing request fired its own redirect.
+  // InteractionRequiredAuthError is different: it specifically means the
+  // cached session/refresh token is dead (expired, revoked in Entra, etc.) —
+  // no amount of retrying silently will ever succeed, only an interactive
+  // login can recover. Without handling it, _currentAccount stays set from
+  // localStorage, isAuthenticated stays true, and the app sits there rendering
+  // as "logged in" while every request 401s forever until the user manually
+  // clears storage. So this one case still gets a single, guarded redirect.
   async getAccessToken(scopes: string[] = [apiScope]): Promise<string | null> {
     let account = this._currentAccount();
 
@@ -98,8 +108,19 @@ export class AuthService {
       return result.accessToken;
     } catch (err) {
       console.warn('MSAL silent token acquisition failed:', err);
+      if (err instanceof InteractionRequiredAuthError) {
+        this.triggerReauth();
+      }
       return null;
     }
+  }
+
+  private triggerReauth(): void {
+    if (this.reauthTriggered) return;
+    this.reauthTriggered = true;
+    this._currentAccount.set(null);
+    this._currentUserProfile.set(null);
+    this.login();
   }
 
   private async loadCurrentUserProfile(): Promise<void> {
