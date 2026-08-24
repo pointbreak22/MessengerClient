@@ -115,12 +115,18 @@ export class AuthService {
     }
   }
 
+  // Does NOT call login() itself. MsalGuard (guarding the '' route) already
+  // does its own silent-acquire-then-redirect for this exact case — calling
+  // login() here too raced it: two concurrent loginRedirect() calls stomp on
+  // each other's state/nonce in MSAL's cache, and the browser comes back to a
+  // ClientAuthError: state_mismatch. Clearing local state here just makes
+  // isAuthenticated/currentUserProfile stop lying about a session that's dead;
+  // the guard is the single place that owns re-authenticating.
   private triggerReauth(): void {
     if (this.reauthTriggered) return;
     this.reauthTriggered = true;
     this._currentAccount.set(null);
     this._currentUserProfile.set(null);
-    this.login();
   }
 
   private async loadCurrentUserProfile(): Promise<void> {
