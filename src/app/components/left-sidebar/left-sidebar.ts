@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { Icon } from '../icon/icon';
 import { ChatStore } from '../../stores/chat.store';
@@ -9,7 +10,7 @@ type Tab = 'chats' | 'groups' | 'friends';
 
 @Component({
   selector: 'app-left-sidebar',
-  imports: [Icon],
+  imports: [Icon, NgTemplateOutlet],
   templateUrl: './left-sidebar.html',
   styleUrl: './left-sidebar.css',
 })
@@ -24,6 +25,8 @@ export class LeftSidebar {
   protected readonly showCreateGroup = signal(false);
   protected readonly groupName = signal('');
   protected readonly selectedMemberIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly showAddFriends = signal(false);
+  protected readonly addFriendsQuery = signal('');
 
   protected readonly chats = this.chatStore.chats;
   protected readonly groups = this.chatStore.groups;
@@ -47,9 +50,6 @@ export class LeftSidebar {
   protected readonly filteredFriends = computed(() =>
     this.friends().filter((u) => u.userName.toLowerCase().includes(this.query().toLowerCase())),
   );
-  // Typing on the Friends tab searches all people (backend), not just your
-  // existing friends — this flips the tab's list over to searchResults().
-  protected readonly friendsSearchActive = computed(() => this.tab() === 'friends' && this.query().trim().length > 0);
   protected readonly canCreateGroup = computed(
     () => this.groupName().trim().length > 0 && this.selectedMemberIds().size > 0,
   );
@@ -81,24 +81,11 @@ export class LeftSidebar {
     this.tab.set(tab);
     if (tab === 'friends') {
       void this.userStore.loadFriendRequests();
-      if (this.query().trim()) {
-        void this.userStore.searchUsers(this.query());
-      }
     }
   }
 
   onQueryInput(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    this.query.set(value);
-
-    if (this.tab() !== 'friends') return;
-
-    clearTimeout(this.searchDebounce);
-    if (!value.trim()) {
-      this.userStore.clearSearchResults();
-      return;
-    }
-    this.searchDebounce = setTimeout(() => void this.userStore.searchUsers(value), 300);
+    this.query.set((event.target as HTMLInputElement).value);
   }
 
   selectChat(id: string): void {
@@ -167,5 +154,25 @@ export class LeftSidebar {
     if (!this.canCreateGroup()) return;
     await this.chatStore.createGroupChat(this.groupName().trim(), [...this.selectedMemberIds()]);
     this.toggleCreateGroup();
+  }
+
+  toggleAddFriends(): void {
+    const next = !this.showAddFriends();
+    this.showAddFriends.set(next);
+    if (!next) {
+      this.addFriendsQuery.set('');
+      this.userStore.clearSearchResults();
+    }
+  }
+
+  onAddFriendsQueryInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.addFriendsQuery.set(value);
+    clearTimeout(this.searchDebounce);
+    if (!value.trim()) {
+      this.userStore.clearSearchResults();
+      return;
+    }
+    this.searchDebounce = setTimeout(() => void this.userStore.searchUsers(value), 300);
   }
 }
