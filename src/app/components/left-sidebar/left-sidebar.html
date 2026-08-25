@@ -27,7 +27,7 @@
     @if (tab() === 'groups' || tab() === 'chats') {
       <button
         (click)="toggleCreateGroup()"
-        title="New multichat"
+        title="{{ tab() === 'groups' ? 'New group' : 'New multichat' }}"
         class="flex h-8 w-8 items-center justify-center
                rounded-lg bg-accent-500
                text-white shadow-lg shadow-accent-500/20
@@ -120,14 +120,14 @@
   <ng-template #createGroupPanel>
     <div class="mb-3 rounded-xl border border-border bg-surface-alt p-3">
       <p class="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
-        New multichat
+        {{ tab() === 'groups' ? 'New group' : 'New multichat' }}
       </p>
 
       <input
         type="text"
         [value]="groupName()"
         (input)="onGroupNameInput($event)"
-        placeholder="Chat name"
+        placeholder="{{ tab() === 'groups' ? 'Group name' : 'Chat name' }}"
         class="mb-2 h-9 w-full rounded-lg border border-border
                bg-surface px-3
                text-xs text-foreground outline-none
@@ -166,7 +166,7 @@
                transition hover:bg-accent-400
                disabled:cursor-not-allowed disabled:opacity-40"
       >
-        Create chat
+        {{ tab() === 'groups' ? 'Create group' : 'Create chat' }}
       </button>
     </div>
   </ng-template>

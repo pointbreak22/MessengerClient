@@ -46,24 +46,36 @@ export class ChatStore {
   // Full member-profile list of the selected chat, including the current user.
   readonly selectedChatMemberProfiles = this._selectedChatMemberProfiles.asReadonly();
 
+  // A popular public group can see many joins/leaves in a short burst (e.g.
+  // 100 people joining around the same time) — refetching once per event, per
+  // every client watching that group, would multiply into thousands of
+  // GET /chats/me calls in a few seconds. Coalescing rapid-fire events into
+  // one refresh keeps that at a handful of calls regardless of burst size.
+  private refreshDebounceTimer?: ReturnType<typeof setTimeout>;
+  private static readonly REFRESH_DEBOUNCE_MS = 400;
+
   constructor() {
     // Payload has chatId/chatName but not members/createdAt/ownerId, so a full
     // refetch is simpler and more correct than fabricating a partial ChatSummary.
-    this.hub.on<AddedToGroupEvent>('AddedToGroup', () => void this.loadChats());
+    this.hub.on<AddedToGroupEvent>('AddedToGroup', () => this.scheduleChatsRefresh());
 
     // Without these, a user who gets kicked or whose group gets deleted by the
     // owner just keeps sitting in that chat until they happen to reload — the
     // backend also force-unsubscribes the connection from the SignalR group
     // itself, so this is UI cleanup, not the only thing standing between them
-    // and stale access. Payload shape doesn't matter here since both handlers
-    // just drop the chat and refetch, same pattern as AddedToGroup.
+    // and stale access. Not debounced like the events below — this is about
+    // *my own* membership changing, so it should react immediately rather
+    // than wait out a coalescing window.
     this.hub.on<{ chatId: string }>('RemovedFromGroup', (e) => void this.handleGoneChat(e.chatId));
     this.hub.on<{ chatId: string }>('ChatDeleted', (e) => void this.handleGoneChat(e.chatId));
 
-    // Sent (best-effort) to the chat's group when someone leaves, so members
-    // who still have it open see the roster update live instead of on next
-    // reload — same refetch-on-event pattern as AddedToGroup.
-    this.hub.on<{ chatId: string }>('GroupMemberRemoved', () => void this.loadChats());
+    // Sent (best-effort) to the chat's group when someone leaves/joins, so
+    // members who still have it open see the roster update live instead of
+    // on next reload. Both confirmed: JoinGroupCommandHandler/AddMemberCommandHandler
+    // commit the membership row before sending this, so a refetch on receipt
+    // never races ahead of the write.
+    this.hub.on<{ chatId: string }>('GroupMemberRemoved', () => this.scheduleChatsRefresh());
+    this.hub.on<{ chatId: string }>('GroupMemberAdded', () => this.scheduleChatsRefresh());
 
     effect(() => {
       void this.resolveSelectedChatMembers(this.selectedChat());
@@ -156,6 +168,11 @@ export class ChatStore {
   async leaveChat(chatId: string): Promise<void> {
     await firstValueFrom(this.api.leaveChat(chatId));
     await this.handleGoneChat(chatId);
+  }
+
+  private scheduleChatsRefresh(): void {
+    clearTimeout(this.refreshDebounceTimer);
+    this.refreshDebounceTimer = setTimeout(() => void this.loadChats(), ChatStore.REFRESH_DEBOUNCE_MS);
   }
 
   private async handleGoneChat(chatId: string): Promise<void> {
