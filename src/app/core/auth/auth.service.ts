@@ -65,8 +65,20 @@ export class AuthService {
   }
 
   logout(): void {
+    const activeAccount = this.msal.instance.getActiveAccount()
+      ?? this._currentAccount()
+      ?? undefined;
+
+    // Сбрасываем локальное состояние Angular
+    this._currentAccount.set(null);
     this._currentUserProfile.set(null);
-    this.msal.logoutRedirect().subscribe();
+
+    // Вызываем logout с указанием authority и конкретного аккаунта
+    this.msal.logoutRedirect({
+      authority: msalConfig.auth.authority,
+      account: activeAccount,
+      postLogoutRedirectUri: msalConfig.auth.postLogoutRedirectUri,
+    }).subscribe();
   }
 
   // Silent-first: most failures (server/config issues, transient network
