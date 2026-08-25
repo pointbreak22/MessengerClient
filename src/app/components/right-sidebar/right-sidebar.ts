@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Icon } from '../icon/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { CallService } from '../../core/signalr/call.service';
@@ -24,9 +24,22 @@ export class RightSidebar {
   protected readonly selectedChat = this.chatStore.selectedChat;
   protected readonly directCounterparts = this.chatStore.directCounterparts;
   protected readonly onlineFriends = this.userStore.onlineFriends;
+  // Adding a member searches all users (not just friends) — anyone can add
+  // anyone. Removing/deleting is owner-only, gated by isOwner() below.
+  protected readonly memberSearchResults = this.userStore.searchResults;
 
   protected readonly getInitials = getInitials;
   protected readonly formatLastSeen = formatLastSeen;
+
+  protected readonly showAddMember = signal(false);
+  protected readonly addMemberQuery = signal('');
+  private addMemberDebounce?: ReturnType<typeof setTimeout>;
+
+  protected readonly isOwner = computed(() => {
+    const chat = this.selectedChat();
+    const myId = this.currentUser()?.id;
+    return !!chat && chat.isGroup && !!myId && chat.ownerId === myId;
+  });
 
   protected readonly selectedChatContact = computed(() => {
     const chat = this.selectedChat();
@@ -74,5 +87,53 @@ export class RightSidebar {
 
   close(): void {
     this.chatStore.closeChat();
+  }
+
+  toggleAddMember(): void {
+    const next = !this.showAddMember();
+    this.showAddMember.set(next);
+    if (!next) {
+      this.addMemberQuery.set('');
+      this.userStore.clearSearchResults();
+    }
+  }
+
+  onAddMemberQueryInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.addMemberQuery.set(value);
+    clearTimeout(this.addMemberDebounce);
+    if (!value.trim()) {
+      this.userStore.clearSearchResults();
+      return;
+    }
+    this.addMemberDebounce = setTimeout(() => void this.userStore.searchUsers(value), 300);
+  }
+
+  isMember(userId: string): boolean {
+    return this.chatStore.selectedChatMemberProfiles().some((m) => m.id === userId);
+  }
+
+  addMember(userId: string): void {
+    const chat = this.selectedChat();
+    if (!chat) return;
+    void this.chatStore.addMember(chat.id, userId);
+  }
+
+  removeMember(userId: string): void {
+    const chat = this.selectedChat();
+    if (!chat || !this.isOwner()) return;
+    void this.chatStore.removeMember(chat.id, userId);
+  }
+
+  deleteGroup(): void {
+    const chat = this.selectedChat();
+    if (!chat || !this.isOwner()) return;
+    void this.chatStore.deleteChat(chat.id);
+  }
+
+  leaveGroup(): void {
+    const chat = this.selectedChat();
+    if (!chat || this.isOwner()) return;
+    void this.chatStore.leaveChat(chat.id);
   }
 }

@@ -7,9 +7,14 @@ export const ApiEndpoints = {
   },
   chats: {
     mine: '/chats/me',
+    byId: (chatId: string) => `/chats/${chatId}`,
     direct: (targetUserId: string) => `/chats/direct/${targetUserId}`,
     group: '/chats/group',
     addMember: (chatId: string) => `/chats/${chatId}/members`,
+    member: (chatId: string, userId: string) => `/chats/${chatId}/members/${userId}`,
+    public: '/chats/public',
+    join: (chatId: string) => `/chats/${chatId}/join`,
+    leave: (chatId: string) => `/chats/${chatId}/leave`,
   },
   messages: {
     byChat: (chatId: string) => `/messages/${chatId}`, // GET history / POST send

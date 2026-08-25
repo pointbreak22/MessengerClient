@@ -29,7 +29,7 @@ export class LeftSidebar {
   protected readonly addFriendsQuery = signal('');
 
   protected readonly chats = this.chatStore.chats;
-  protected readonly groups = this.chatStore.groups;
+  protected readonly publicGroups = this.chatStore.publicGroups;
   protected readonly friends = this.userStore.friends;
   protected readonly selectedChatId = this.chatStore.selectedChatId;
   protected readonly directCounterparts = this.chatStore.directCounterparts;
@@ -44,9 +44,6 @@ export class LeftSidebar {
   protected readonly filteredChats = computed(() =>
     this.chats().filter((c) => this.chatName(c).toLowerCase().includes(this.query().toLowerCase())),
   );
-  protected readonly filteredGroups = computed(() =>
-    this.groups().filter((c) => this.chatName(c).toLowerCase().includes(this.query().toLowerCase())),
-  );
   protected readonly filteredFriends = computed(() =>
     this.friends().filter((u) => u.userName.toLowerCase().includes(this.query().toLowerCase())),
   );
@@ -59,7 +56,7 @@ export class LeftSidebar {
       case 'chats':
         return this.chats().length;
       case 'groups':
-        return this.groups().length;
+        return this.publicGroups().length;
       case 'friends':
         return this.friends().length;
     }
@@ -81,11 +78,18 @@ export class LeftSidebar {
     this.tab.set(tab);
     if (tab === 'friends') {
       void this.userStore.loadFriendRequests();
+    } else if (tab === 'groups') {
+      void this.chatStore.loadPublicGroups(this.query());
     }
   }
 
   onQueryInput(event: Event): void {
-    this.query.set((event.target as HTMLInputElement).value);
+    const value = (event.target as HTMLInputElement).value;
+    this.query.set(value);
+
+    if (this.tab() !== 'groups') return;
+    clearTimeout(this.searchDebounce);
+    this.searchDebounce = setTimeout(() => void this.chatStore.loadPublicGroups(value), 300);
   }
 
   selectChat(id: string): void {
@@ -152,8 +156,19 @@ export class LeftSidebar {
 
   async submitCreateGroup(): Promise<void> {
     if (!this.canCreateGroup()) return;
-    await this.chatStore.createGroupChat(this.groupName().trim(), [...this.selectedMemberIds()]);
+    // No public/private toggle in the form — it's implied by which tab the
+    // panel was opened from: a multichat started from Chats is private, one
+    // started from Groups is public. Same panel, same submit, different flag.
+    const isPublic = this.tab() === 'groups';
+    await this.chatStore.createGroupChat(this.groupName().trim(), [...this.selectedMemberIds()], isPublic);
+    if (isPublic) {
+      void this.chatStore.loadPublicGroups(this.query());
+    }
     this.toggleCreateGroup();
+  }
+
+  joinGroup(chatId: string): void {
+    void this.chatStore.joinGroup(chatId, this.query());
   }
 
   toggleAddFriends(): void {

@@ -85,15 +85,48 @@
         </div>
       }
 
+      @if (chat.isGroup && isOwner()) {
+        <button
+          (click)="deleteGroup()"
+          class="mt-4 flex items-center gap-1.5 rounded-xl border border-border
+                 bg-surface-alt px-3 py-2
+                 text-xs font-medium text-danger
+                 transition hover:bg-surface-hover"
+        >
+          <svg appIcon="close" class="h-3.5 w-3.5"></svg>
+          Delete group
+        </button>
+      } @else if (chat.isGroup) {
+        <button
+          (click)="leaveGroup()"
+          class="mt-4 flex items-center gap-1.5 rounded-xl border border-border
+                 bg-surface-alt px-3 py-2
+                 text-xs font-medium text-danger
+                 transition hover:bg-surface-hover"
+        >
+          <svg appIcon="logout" class="h-3.5 w-3.5"></svg>
+          Leave group
+        </button>
+      }
+
     </div>
 
     <div class="flex-1 overflow-y-auto p-4">
 
       @if (chat.isGroup) {
         <section>
-          <p class="mb-3 px-1 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
-            Members — {{ otherMembers().length + 1 }}
-          </p>
+          <div class="mb-3 flex items-center justify-between px-1">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+              Members — {{ otherMembers().length + 1 }}
+            </p>
+            <button
+              (click)="toggleAddMember()"
+              title="Add member"
+              class="grid h-6 w-6 place-items-center rounded-md bg-accent-500 text-white transition hover:bg-accent-400"
+            >
+              <svg [appIcon]="showAddMember() ? 'close' : 'plus'" class="h-3.5 w-3.5"></svg>
+            </button>
+          </div>
           <div class="space-y-1">
 
             <div class="flex items-center gap-3 rounded-xl p-2">
@@ -109,7 +142,7 @@
             </div>
 
             @for (m of otherMembers(); track m.id) {
-              <div class="flex items-center gap-3 rounded-xl p-2 transition hover:bg-surface-hover">
+              <div class="group flex items-center gap-3 rounded-xl p-2 transition hover:bg-surface-hover">
                 <div class="relative shrink-0">
                   <div
                     class="flex h-9 w-9 items-center justify-center
@@ -131,10 +164,60 @@
                     {{ m.isOnline ? 'Online' : formatLastSeen(m.lastSeenAt) }}
                   </p>
                 </div>
+                @if (isOwner()) {
+                  <button
+                    (click)="removeMember(m.id)"
+                    title="Remove from group"
+                    class="shrink-0 rounded-lg p-1.5 text-faint-foreground
+                           opacity-100 transition
+                           hover:bg-surface-hover hover:text-danger
+                           md:opacity-0 md:group-hover:opacity-100"
+                  >
+                    <svg appIcon="close" class="h-3.5 w-3.5"></svg>
+                  </button>
+                }
               </div>
             }
 
           </div>
+
+          @if (showAddMember()) {
+            <div class="mt-3 rounded-xl border border-border bg-surface-alt p-3">
+              <input
+                type="text"
+                [value]="addMemberQuery()"
+                (input)="onAddMemberQueryInput($event)"
+                placeholder="Search by username"
+                class="mb-2 h-9 w-full rounded-lg border border-border
+                       bg-surface px-3
+                       text-xs text-foreground outline-none
+                       placeholder:text-faint-foreground
+                       transition focus:border-accent-500/40"
+              />
+              <div class="max-h-40 space-y-0.5 overflow-y-auto">
+                @for (u of memberSearchResults(); track u.id) {
+                  <div class="flex items-center gap-2 rounded-lg p-1.5">
+                    <span class="min-w-0 flex-1 truncate text-xs text-foreground">{{ u.userName }}</span>
+                    @if (isMember(u.id)) {
+                      <span class="shrink-0 text-[10px] text-faint-foreground">Member</span>
+                    } @else {
+                      <button
+                        (click)="addMember(u.id)"
+                        title="Add"
+                        class="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-accent-500 text-white transition hover:bg-accent-400"
+                      >
+                        <svg appIcon="plus" class="h-3.5 w-3.5"></svg>
+                      </button>
+                    }
+                  </div>
+                } @empty {
+                  <p class="px-1 py-2 text-center text-[11px] text-faint-foreground">
+                    {{ addMemberQuery() ? 'No people found' : 'Type a username to search' }}
+                  </p>
+                }
+              </div>
+            </div>
+          }
         </section>
       }
 
