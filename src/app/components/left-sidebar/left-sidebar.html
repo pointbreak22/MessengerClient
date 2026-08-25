@@ -235,13 +235,12 @@
                  {{ selectedChatId() === chat.id ? 'bg-surface-hover' : '' }}"
         >
           <div class="relative shrink-0">
-            <div
-              class="flex h-11 w-11 items-center justify-center
-                     rounded-full bg-surface-alt
-                     text-xs font-semibold text-muted-foreground"
-            >
-              {{ chatInitials(chat) }}
-            </div>
+            <app-avatar
+              [name]="chatName(chat)"
+              [avatarUrl]="chatAvatarUrl(chat)"
+              sizeClass="h-11 w-11"
+              textClass="text-xs font-semibold"
+            />
             @if (!chat.isGroup && chatIsOnline(chat)) {
               <span
                 class="absolute bottom-0 right-0 h-3 w-3
@@ -361,13 +360,12 @@
           <div class="space-y-1">
             @for (r of incomingRequests(); track r.id) {
               <div class="flex items-center gap-3 rounded-xl p-2">
-                <div
-                  class="flex h-9 w-9 shrink-0 items-center justify-center
-                         rounded-full bg-surface-alt
-                         text-xs font-semibold text-muted-foreground"
-                >
-                  {{ getInitials(requestSenderName(r.fromUserId)) }}
-                </div>
+                <app-avatar
+                  [name]="requestSenderName(r.fromUserId)"
+                  [avatarUrl]="requestSenderAvatarUrl(r.fromUserId)"
+                  sizeClass="h-9 w-9"
+                  textClass="text-xs font-semibold"
+                />
                 <p class="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
                   {{ requestSenderName(r.fromUserId) }}
                 </p>
@@ -402,13 +400,12 @@
                  transition hover:bg-surface-hover"
         >
           <div class="relative shrink-0">
-            <div
-              class="flex h-11 w-11 items-center justify-center
-                     rounded-full bg-surface-alt
-                     text-xs font-semibold text-muted-foreground"
-            >
-              {{ getInitials(friend.userName) }}
-            </div>
+            <app-avatar
+              [name]="friend.userName"
+              [avatarUrl]="friend.avatarUrl"
+              sizeClass="h-11 w-11"
+              textClass="text-xs font-semibold"
+            />
             @if (friend.isOnline) {
               <span
                 class="absolute bottom-0 right-0 h-3 w-3

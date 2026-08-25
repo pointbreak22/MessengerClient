@@ -1,6 +1,6 @@
 {
-  "name": "Messenger",
-  "short_name": "Messenger",
+  "name": "PBMessenger",
+  "short_name": "PBMessenger",
   "description": "Real-time chat, groups and calls.",
   "display": "standalone",
   "theme_color": "#0c0e13",

@@ -14,13 +14,12 @@
       </button>
 
       <div class="relative shrink-0">
-        <div
-          class="flex h-10 w-10 items-center justify-center
-                 rounded-full bg-surface-alt
-                 text-xs font-semibold text-muted-foreground"
-        >
-          {{ getInitials(chatName()) }}
-        </div>
+        <app-avatar
+          [name]="chatName()"
+          [avatarUrl]="chatAvatarUrl()"
+          sizeClass="h-10 w-10"
+          textClass="text-xs font-semibold"
+        />
         @if (!c.isGroup && directCounterparts()[c.id]?.isOnline) {
           <span
             class="absolute bottom-0 right-0 h-2.5 w-2.5

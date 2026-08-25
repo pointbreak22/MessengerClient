@@ -1,6 +1,7 @@
 import { Component, ElementRef, ViewChild, afterRenderEffect, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
+import { Avatar } from '../../components/avatar/avatar';
 import { Icon } from '../../components/icon/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { CallService } from '../../core/signalr/call.service';
@@ -12,7 +13,7 @@ import { formatLastSeen, formatMessageTime, getInitials } from '../../shared/use
 
 @Component({
   selector: 'app-chat',
-  imports: [FormsModule, Icon],
+  imports: [FormsModule, Icon, Avatar],
   templateUrl: './chat.html',
   styleUrl: './chat.css',
 })
@@ -74,6 +75,13 @@ export class Chat {
     const chat = this.chat();
     if (!chat) return '';
     return chat.isGroup ? (chat.name ?? '') : (this.directCounterparts()[chat.id]?.userName ?? '');
+  }
+
+  // null for groups — no group avatar concept, Avatar falls back to initials.
+  chatAvatarUrl(): string | null {
+    const chat = this.chat();
+    if (!chat || chat.isGroup) return null;
+    return this.directCounterparts()[chat.id]?.avatarUrl ?? null;
   }
 
   isOwn(message: ChatMessage): boolean {

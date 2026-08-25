@@ -6,14 +6,14 @@
       <!-- Ringing / dialing card -->
       <div class="w-full max-w-xs rounded-2xl border border-border bg-surface p-6 text-center shadow-2xl">
 
-        <div
-          class="mx-auto flex h-20 w-20 items-center justify-center
-                 rounded-full bg-gradient-to-br
-                 from-accent-500/30 to-accent2-500/30
-                 text-xl font-semibold text-accent-400
-                 ring-4 ring-accent-500/5"
-        >
-          {{ getInitials(call.remoteProfile()?.userName) }}
+        <div class="mx-auto w-fit">
+          <app-avatar
+            [name]="call.remoteProfile()?.userName"
+            [avatarUrl]="call.remoteProfile()?.avatarUrl"
+            sizeClass="h-20 w-20"
+            textClass="text-xl font-semibold"
+            colorClass="bg-gradient-to-br from-accent-500/30 to-accent2-500/30 text-accent-400 ring-4 ring-accent-500/5"
+          />
         </div>
 
         <h3 class="mt-4 text-sm font-semibold text-foreground">
@@ -76,15 +76,13 @@
           </div>
         } @else {
           <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
-            <div
-              class="flex h-24 w-24 items-center justify-center
-                     rounded-full bg-gradient-to-br
-                     from-accent-500/30 to-accent2-500/30
-                     text-2xl font-semibold text-accent-400
-                     ring-4 ring-accent-500/5"
-            >
-              {{ getInitials(call.remoteProfile()?.userName) }}
-            </div>
+            <app-avatar
+              [name]="call.remoteProfile()?.userName"
+              [avatarUrl]="call.remoteProfile()?.avatarUrl"
+              sizeClass="h-24 w-24"
+              textClass="text-2xl font-semibold"
+              colorClass="bg-gradient-to-br from-accent-500/30 to-accent2-500/30 text-accent-400 ring-4 ring-accent-500/5"
+            />
             <h3 class="text-sm font-semibold text-foreground">{{ call.remoteProfile()?.userName }}</h3>
             <p class="text-xs text-online">Connected</p>
           </div>

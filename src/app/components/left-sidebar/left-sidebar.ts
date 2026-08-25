@@ -1,5 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { Avatar } from '../avatar/avatar';
 import { Icon } from '../icon/icon';
 import { ChatStore } from '../../stores/chat.store';
 import { UserStore } from '../../stores/user.store';
@@ -10,7 +11,7 @@ type Tab = 'chats' | 'groups' | 'friends';
 
 @Component({
   selector: 'app-left-sidebar',
-  imports: [Icon, NgTemplateOutlet],
+  imports: [Icon, NgTemplateOutlet, Avatar],
   templateUrl: './left-sidebar.html',
   styleUrl: './left-sidebar.css',
 })
@@ -79,6 +80,12 @@ export class LeftSidebar {
     return getInitials(this.chatName(chat));
   }
 
+  // null for groups — there's no group avatar concept, Avatar just falls
+  // back to initials in that case.
+  chatAvatarUrl(chat: ChatSummary): string | null {
+    return chat.isGroup ? null : (this.directCounterparts()[chat.id]?.avatarUrl ?? null);
+  }
+
   chatIsOnline(chat: ChatSummary): boolean {
     return !chat.isGroup && (this.directCounterparts()[chat.id]?.isOnline ?? false);
   }
@@ -119,6 +126,10 @@ export class LeftSidebar {
 
   requestSenderName(fromUserId: string): string {
     return this.requestSenders()[fromUserId]?.userName ?? '';
+  }
+
+  requestSenderAvatarUrl(fromUserId: string): string | null {
+    return this.requestSenders()[fromUserId]?.avatarUrl ?? null;
   }
 
   sendFriendRequest(userId: string): void {

@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { Avatar } from '../avatar/avatar';
 import { Icon } from '../icon/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { CallService } from '../../core/signalr/call.service';
@@ -9,7 +10,7 @@ import { formatLastSeen, getInitials } from '../../shared/user-display';
 
 @Component({
   selector: 'app-right-sidebar',
-  imports: [Icon],
+  imports: [Icon, Avatar],
   templateUrl: './right-sidebar.html',
   styleUrl: './right-sidebar.css',
 })
@@ -83,6 +84,13 @@ export class RightSidebar {
     const chat = this.selectedChat();
     if (!chat) return '';
     return chat.isGroup ? (chat.name ?? '') : (this.selectedChatContact()?.userName ?? '');
+  }
+
+  // null for groups — no group avatar concept, Avatar falls back to initials.
+  chatAvatarUrl(): string | null {
+    const chat = this.selectedChat();
+    if (!chat || chat.isGroup) return null;
+    return this.selectedChatContact()?.avatarUrl ?? null;
   }
 
   messageFriend(userId: string): void {

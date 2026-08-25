@@ -60,6 +60,14 @@ export class AuthService {
     }
   }
 
+  // Called after a successful avatar/name change (Header) so the new value
+  // shows up everywhere currentUserProfile is read, without a full refetch.
+  updateProfile(patch: Partial<UserProfile>): void {
+    const current = this._currentUserProfile();
+    if (!current) return;
+    this._currentUserProfile.set({ ...current, ...patch });
+  }
+
   login(): void {
     this.msal.loginRedirect({ scopes: [apiScope] }).subscribe();
   }

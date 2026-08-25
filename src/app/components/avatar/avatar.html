@@ -1,0 +1,11 @@
+@if (avatarUrl()) {
+  <img
+    [src]="avatarUrl()"
+    [alt]="name() ?? ''"
+    class="rounded-full object-cover {{ sizeClass() }}"
+  />
+} @else {
+  <div class="flex items-center justify-center rounded-full {{ sizeClass() }} {{ colorClass() }} {{ textClass() }}">
+    {{ initials() }}
+  </div>
+}

@@ -1,11 +1,12 @@
 import { Component, inject } from '@angular/core';
+import { Avatar } from '../avatar/avatar';
 import { Icon } from '../icon/icon';
 import { CallService } from '../../core/signalr/call.service';
 import { getInitials } from '../../shared/user-display';
 
 @Component({
   selector: 'app-call-overlay',
-  imports: [Icon],
+  imports: [Icon, Avatar],
   templateUrl: './call-overlay.html',
   styleUrl: './call-overlay.css',
 })
