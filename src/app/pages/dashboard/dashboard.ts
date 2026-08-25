@@ -1,4 +1,4 @@
-import { Component, OnDestroy, effect, inject } from '@angular/core';
+import { Component, OnDestroy, computed, effect, inject } from '@angular/core';
 import { CallOverlay } from '../../components/call-overlay/call-overlay';
 import { Header } from '../../components/header/header';
 import { Icon } from '../../components/icon/icon';
@@ -23,6 +23,18 @@ export class Dashboard implements OnDestroy {
   private readonly auth = inject(AuthService);
 
   protected readonly selectedChat = this.chatStore.selectedChat;
+  private readonly mobileInfoOpen = this.chatStore.mobileInfoOpen;
+
+  // Below xl, the info panel takes the main pane's place entirely; above xl
+  // main is always visible (xl:flex in the template overrides this). The
+  // "no chat selected" case still needs the tablet/laptop placeholder to show
+  // (hidden md:flex) — mobileInfoOpen can only be true when a chat *is*
+  // selected, so it never competes with that branch.
+  protected readonly mainDisplayClass = computed(() => {
+    if (this.mobileInfoOpen()) return 'hidden';
+    if (this.selectedChat()) return 'flex';
+    return 'hidden md:flex';
+  });
 
   constructor() {
     // This route is behind MsalGuard, so we're always authenticated here —

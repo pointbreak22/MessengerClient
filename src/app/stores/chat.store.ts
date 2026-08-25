@@ -28,10 +28,16 @@ export class ChatStore {
   // not the member-only subset of _chats, so groups you haven't joined yet
   // are actually discoverable.
   private readonly _publicGroups = signal<PublicGroupDto[]>([]);
+  // Below xl, RightSidebar is otherwise unreachable (hidden ... xl:flex) —
+  // this drives a full-screen toggle in its place, opened from a button in
+  // the chat header. Irrelevant at xl+, where the sidebar is always visible
+  // regardless of this flag.
+  private readonly _mobileInfoOpen = signal(false);
 
   // "Chats" tab = direct chats + private groups.
   readonly chats = computed(() => this._chats().filter((c) => !c.isGroup || !c.isPublic));
   readonly publicGroups = this._publicGroups.asReadonly();
+  readonly mobileInfoOpen = this._mobileInfoOpen.asReadonly();
   readonly selectedChatId = this._selectedChatId.asReadonly();
   readonly selectedChat = computed<ChatSummary | null>(
     () => this._chats().find((c) => c.id === this._selectedChatId()) ?? null,
@@ -53,6 +59,11 @@ export class ChatStore {
     // just drop the chat and refetch, same pattern as AddedToGroup.
     this.hub.on<{ chatId: string }>('RemovedFromGroup', (e) => void this.handleGoneChat(e.chatId));
     this.hub.on<{ chatId: string }>('ChatDeleted', (e) => void this.handleGoneChat(e.chatId));
+
+    // Sent (best-effort) to the chat's group when someone leaves, so members
+    // who still have it open see the roster update live instead of on next
+    // reload — same refetch-on-event pattern as AddedToGroup.
+    this.hub.on<{ chatId: string }>('GroupMemberRemoved', () => void this.loadChats());
 
     effect(() => {
       void this.resolveSelectedChatMembers(this.selectedChat());
@@ -79,6 +90,7 @@ export class ChatStore {
     if (previousId) void this.hub.leaveChatRoom(previousId).catch(() => {});
 
     this._selectedChatId.set(id);
+    this._mobileInfoOpen.set(false);
     void this.hub.joinChatRoom(id).catch(() => {});
   }
 
@@ -86,6 +98,15 @@ export class ChatStore {
     const previousId = this._selectedChatId();
     if (previousId) void this.hub.leaveChatRoom(previousId).catch(() => {});
     this._selectedChatId.set(null);
+    this._mobileInfoOpen.set(false);
+  }
+
+  toggleMobileInfo(): void {
+    this._mobileInfoOpen.update((v) => !v);
+  }
+
+  closeMobileInfo(): void {
+    this._mobileInfoOpen.set(false);
   }
 
   async createDirectChat(targetUserId: string): Promise<void> {

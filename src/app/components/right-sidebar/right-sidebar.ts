@@ -24,6 +24,10 @@ export class RightSidebar {
   protected readonly selectedChat = this.chatStore.selectedChat;
   protected readonly directCounterparts = this.chatStore.directCounterparts;
   protected readonly onlineFriends = this.userStore.onlineFriends;
+  // Below xl this aside is otherwise unreachable (hidden ... xl:flex) — this
+  // flag, toggled from a button in the chat header, makes it take over
+  // full-screen there instead.
+  protected readonly mobileInfoOpen = this.chatStore.mobileInfoOpen;
   // Adding a member searches all users (not just friends) — anyone can add
   // anyone. Removing/deleting is owner-only, gated by isOwner() below.
   protected readonly memberSearchResults = this.userStore.searchResults;
@@ -87,6 +91,12 @@ export class RightSidebar {
 
   close(): void {
     this.chatStore.closeChat();
+  }
+
+  // Distinct from close(): this only collapses the mobile info overlay back
+  // to the chat, it doesn't deselect the conversation.
+  backToChat(): void {
+    this.chatStore.closeMobileInfo();
   }
 
   toggleAddMember(): void {

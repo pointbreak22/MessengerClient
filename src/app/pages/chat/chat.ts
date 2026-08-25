@@ -101,6 +101,13 @@ export class Chat {
     this.chatStore.closeChat();
   }
 
+  // Below xl, RightSidebar is otherwise unreachable — this opens it as a
+  // full-screen overlay in place of the chat (see RightSidebar.backToChat()
+  // for the way back).
+  openInfo(): void {
+    this.chatStore.toggleMobileInfo();
+  }
+
   startCall(video: boolean): void {
     const chat = this.chat();
     if (!chat || chat.isGroup) return;

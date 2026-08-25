@@ -1,21 +1,31 @@
 <aside
-  class="hidden w-[300px] shrink-0 flex-col
+  class="w-full shrink-0 flex-col
          border-l border-border
          bg-surface
-         xl:flex"
+         xl:flex xl:w-[300px]
+         {{ mobileInfoOpen() ? 'flex' : 'hidden' }}"
 >
 
   @if (selectedChat(); as chat) {
 
     <!-- Selected conversation -->
     <div class="flex items-center justify-between px-4 pt-4">
-      <span class="text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
-        {{ chat.isGroup ? 'Group info' : 'Contact info' }}
-      </span>
+      <div class="flex items-center gap-2">
+        <button
+          (click)="backToChat()"
+          title="Back to chat"
+          class="grid h-7 w-7 place-items-center rounded-lg text-faint-foreground transition hover:bg-surface-hover hover:text-foreground xl:hidden"
+        >
+          <svg appIcon="chevron-left" class="h-4 w-4"></svg>
+        </button>
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+          {{ chat.isGroup ? 'Group info' : 'Contact info' }}
+        </span>
+      </div>
       <button
         (click)="close()"
         title="Close"
-        class="grid h-7 w-7 place-items-center rounded-lg text-faint-foreground transition hover:bg-surface-hover hover:text-foreground"
+        class="hidden h-7 w-7 place-items-center rounded-lg text-faint-foreground transition hover:bg-surface-hover hover:text-foreground xl:grid"
       >
         <svg appIcon="close" class="h-4 w-4"></svg>
       </button>

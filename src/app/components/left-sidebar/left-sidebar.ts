@@ -32,6 +32,15 @@ export class LeftSidebar {
   protected readonly publicGroups = this.chatStore.publicGroups;
   protected readonly friends = this.userStore.friends;
   protected readonly selectedChatId = this.chatStore.selectedChatId;
+  private readonly mobileInfoOpen = this.chatStore.mobileInfoOpen;
+
+  // Same reasoning as Dashboard.mainDisplayClass: below xl, the info panel
+  // (opened from the chat header) takes over full-screen, so this hides too —
+  // otherwise it'd still be forced visible by its own md:flex two-pane rule.
+  protected readonly asideDisplayClass = computed(() => {
+    if (this.mobileInfoOpen()) return 'hidden';
+    return this.selectedChatId() ? 'hidden md:flex' : 'flex';
+  });
   protected readonly directCounterparts = this.chatStore.directCounterparts;
   protected readonly incomingRequests = this.userStore.incomingRequests;
   protected readonly requestSenders = this.userStore.requestSenders;

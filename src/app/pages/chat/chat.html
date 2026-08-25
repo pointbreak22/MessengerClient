@@ -66,6 +66,14 @@
         }
 
         <button
+          (click)="openInfo()"
+          class="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground xl:hidden"
+          title="{{ c.isGroup ? 'Group info' : 'Contact info' }}"
+        >
+          <svg appIcon="user" class="h-4 w-4"></svg>
+        </button>
+
+        <button
           (click)="close()"
           class="hidden h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground md:grid"
           title="Close conversation"
