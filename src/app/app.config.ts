@@ -3,12 +3,14 @@ import {
   ApplicationConfig,
   inject,
   Injector,
+  isDevMode,
   provideAppInitializer,
   provideBrowserGlobalErrorListeners,
   runInInjectionContext,
 } from '@angular/core';
 import { MsalService } from '@azure/msal-angular';
 import { provideRouter, withEnabledBlockingInitialNavigation } from '@angular/router'; // <-- Добавлен импорт
+import { provideServiceWorker } from '@angular/service-worker';
 import { firstValueFrom } from 'rxjs';
 
 import { msalProviders } from './core/auth/msal-providers';
@@ -25,6 +27,10 @@ export const appConfig: ApplicationConfig = {
     ),
     provideHttpClient(withInterceptors([apiAuthInterceptor])),
     ...msalProviders,
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
     provideAppInitializer(async () => {
       const msal = inject(MsalService);
       const injector = inject(Injector);
@@ -48,5 +54,5 @@ export const appConfig: ApplicationConfig = {
       const auth = runInInjectionContext(injector, () => inject(AuthService));
       await auth.initializeSession();
     }),
-  ]
+  ],
 };
