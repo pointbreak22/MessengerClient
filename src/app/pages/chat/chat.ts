@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, afterRenderEffect, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { Icon } from '../../components/icon/icon';
@@ -24,14 +24,19 @@ export class Chat {
   protected readonly call = inject(CallService);
 
   @ViewChild('fileInput') private readonly fileInput!: ElementRef<HTMLInputElement>;
+  @ViewChild('messagesContainer') private readonly messagesContainer?: ElementRef<HTMLDivElement>;
 
   protected readonly chat = this.chatStore.selectedChat;
   protected readonly directCounterparts = this.chatStore.directCounterparts;
   protected readonly memberCount = computed(() => this.chatStore.selectedChatMemberProfiles().length);
 
+  // MessageStore keeps history newest-first (matches the API's paging cursor,
+  // which walks backward from the newest message) — reversed here purely for
+  // display, so the thread reads top-to-bottom like a normal chat.
   protected readonly messages = computed(() => {
     const chat = this.chat();
-    return chat ? this.messageStore.messagesFor(chat.id)() : [];
+    if (!chat) return [];
+    return [...this.messageStore.messagesFor(chat.id)()].reverse();
   });
 
   // 1:1 only — a group call needs an SFU/media server, not just SignalR
@@ -54,6 +59,14 @@ export class Chat {
       if (!chat) return;
       void this.messageStore.loadMessages(chat.id);
       void this.messageStore.markRead(chat.id);
+    });
+
+    // Keep the thread pinned to the newest message — on chat switch, on
+    // history load, and on every new incoming/outgoing message.
+    afterRenderEffect(() => {
+      this.messages();
+      const el = this.messagesContainer?.nativeElement;
+      if (el) el.scrollTop = el.scrollHeight;
     });
   }
 

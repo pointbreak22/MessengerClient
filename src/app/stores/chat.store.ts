@@ -1,4 +1,5 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { HubConnectionState } from '@microsoft/signalr';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../core/auth/auth.service';
 import { ChatHubService } from '../core/signalr/chat-hub.service';
@@ -39,6 +40,15 @@ export class ChatStore {
 
     effect(() => {
       void this.resolveSelectedChatMembers(this.selectedChat());
+    });
+
+    // SignalR groups are keyed by ConnectionId — automatic reconnect gets a new
+    // one, so the server drops prior group membership. Rejoin the open chat's
+    // room whenever the connection comes back, or NewMessage stops arriving.
+    effect(() => {
+      if (this.hub.connectionState() !== HubConnectionState.Connected) return;
+      const id = untracked(() => this._selectedChatId());
+      if (id) void this.hub.joinChatRoom(id).catch(() => {});
     });
   }
 

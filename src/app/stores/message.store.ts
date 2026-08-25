@@ -54,9 +54,12 @@ export class MessageStore {
       createdAt: new Date().toISOString(),
     };
 
-    this._messagesByChat.update((byChat) => ({
-      ...byChat,
-      [message.chatId]: [message, ...(byChat[message.chatId] ?? [])],
-    }));
+    this._messagesByChat.update((byChat) => {
+      const existing = byChat[message.chatId] ?? [];
+      // Outbox dispatch is at-least-once — a retry after a transient failure
+      // between SendAsync and MarkSentAsync can redeliver the same message.
+      if (existing.some((m) => m.id === message.id)) return byChat;
+      return { ...byChat, [message.chatId]: [message, ...existing] };
+    });
   }
 }
