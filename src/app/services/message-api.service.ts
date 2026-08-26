@@ -34,4 +34,10 @@ export class MessageApiService {
   markRead(chatId: string): Observable<void> {
     return this.http.post<void>(`${this.base}${ApiEndpoints.messages.markRead(chatId)}`, {});
   }
+
+  // Full-text search across every chat the current user is a member of.
+  searchMessages(query: string, limit = 20): Observable<ChatMessage[]> {
+    const params = new HttpParams().set('q', query).set('limit', limit);
+    return this.http.get<ChatMessage[]>(`${this.base}${ApiEndpoints.messages.search}`, { params });
+  }
 }

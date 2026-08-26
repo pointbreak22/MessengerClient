@@ -31,6 +31,9 @@
 
         <input
           type="text"
+          [value]="searchQuery()"
+          (input)="onSearchInput($event)"
+          (focus)="openSearchDropdown()"
           placeholder="Search messages, people..."
           class="h-10 w-full rounded-xl
                  border border-border
@@ -43,15 +46,99 @@
                  focus:border-accent-500/40"
         />
 
-        <div
-          class="absolute right-2 top-1/2
-                 -translate-y-1/2
-                 rounded-md border border-border
-                 px-2 py-1
-                 text-[10px] text-faint-foreground"
-        >
-          ⌘ K
-        </div>
+        @if (!searchQuery()) {
+          <div
+            class="pointer-events-none absolute right-2 top-1/2
+                   -translate-y-1/2
+                   rounded-md border border-border
+                   px-2 py-1
+                   text-[10px] text-faint-foreground"
+          >
+            ⌘ K
+          </div>
+        }
+
+        @if (showSearchDropdown()) {
+          <button
+            (click)="closeSearchDropdown()"
+            class="fixed inset-0 z-40 cursor-default"
+            aria-label="Close search"
+          ></button>
+
+          <div
+            class="absolute left-0 right-0 top-full z-50 mt-2
+                   max-h-96 overflow-y-auto
+                   rounded-xl border border-border
+                   bg-surface-elevated p-2
+                   shadow-2xl shadow-black/30"
+          >
+            @if (matchedChats().length) {
+              <p class="mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+                Chats
+              </p>
+              @for (c of matchedChats(); track c.id) {
+                <button
+                  (click)="selectChatResult(c.id)"
+                  class="flex w-full items-center gap-3 rounded-lg p-2
+                         text-left transition hover:bg-surface-hover"
+                >
+                  <app-avatar
+                    [name]="chatDisplayName(c)"
+                    [avatarUrl]="chatAvatarUrl(c)"
+                    sizeClass="h-8 w-8"
+                    textClass="text-[11px] font-semibold"
+                  />
+                  <span class="truncate text-xs text-foreground">{{ chatDisplayName(c) }}</span>
+                </button>
+              }
+            }
+
+            @if (matchedFriends().length) {
+              <p class="mb-1 px-2 pt-2 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+                People
+              </p>
+              @for (f of matchedFriends(); track f.id) {
+                <button
+                  (click)="selectFriendResult(f.id)"
+                  class="flex w-full items-center gap-3 rounded-lg p-2
+                         text-left transition hover:bg-surface-hover"
+                >
+                  <app-avatar
+                    [name]="f.userName"
+                    [avatarUrl]="f.avatarUrl"
+                    sizeClass="h-8 w-8"
+                    textClass="text-[11px] font-semibold"
+                  />
+                  <span class="truncate text-xs text-foreground">{{ f.userName }}</span>
+                </button>
+              }
+            }
+
+            @if (matchedMessages().length) {
+              <p class="mb-1 px-2 pt-2 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+                Messages
+              </p>
+              @for (m of matchedMessages(); track m.id) {
+                <button
+                  (click)="selectMessageResult(m)"
+                  class="flex w-full flex-col items-start gap-0.5 rounded-lg p-2
+                         text-left transition hover:bg-surface-hover"
+                >
+                  <span class="text-[11px] font-medium text-accent-400">{{ messageChatName(m) }}</span>
+                  <span class="w-full truncate text-xs text-foreground">{{ m.text }}</span>
+                </button>
+              }
+            }
+
+            @if (searchingMessages()) {
+              <p class="px-2 py-2 text-center text-[11px] text-faint-foreground">Searching messages…</p>
+            }
+
+            @if (!matchedChats().length && !matchedFriends().length && !matchedMessages().length && !searchingMessages()) {
+              <p class="px-2 py-4 text-center text-[11px] text-faint-foreground">No matches</p>
+            }
+          </div>
+        }
 
       </div>
     </div>
@@ -60,19 +147,86 @@
     <div class="ml-auto flex items-center gap-2 md:ml-6">
 
       <!-- Notifications -->
-      <button
-        class="relative flex h-9 w-9 items-center justify-center
-               rounded-xl text-muted-foreground
-               transition hover:bg-surface-hover
-               hover:text-foreground"
-      >
-        <svg appIcon="bell" class="h-[18px] w-[18px]"></svg>
+      <div class="relative">
+        <button
+          (click)="toggleNotifications()"
+          title="Notifications"
+          class="relative flex h-9 w-9 items-center justify-center
+                 rounded-xl text-muted-foreground
+                 transition hover:bg-surface-hover
+                 hover:text-foreground"
+        >
+          <svg appIcon="bell" class="h-[18px] w-[18px]"></svg>
 
-        <span
-          class="absolute right-1.5 top-1.5 h-1.5 w-1.5
-                 rounded-full bg-accent-500"
-        ></span>
-      </button>
+          @if (incomingRequests().length) {
+            <span
+              class="absolute right-1 top-1 flex h-4 min-w-4
+                     items-center justify-center rounded-full
+                     bg-accent-500 px-1
+                     text-[9px] font-semibold text-white"
+            >
+              {{ incomingRequests().length }}
+            </span>
+          }
+        </button>
+
+        @if (showNotifications()) {
+          <button
+            (click)="closeNotifications()"
+            class="fixed inset-0 z-40 cursor-default"
+            aria-label="Close notifications"
+          ></button>
+
+          <div
+            class="absolute right-0 top-full z-50 mt-2 w-72
+                   rounded-2xl border border-border
+                   bg-surface-elevated p-3
+                   shadow-2xl shadow-black/30"
+          >
+            <p class="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+              Friend requests
+            </p>
+
+            <div class="max-h-72 space-y-1 overflow-y-auto">
+              @for (r of incomingRequests(); track r.id) {
+                <div class="flex items-center gap-3 rounded-xl p-2">
+                  <app-avatar
+                    [name]="requestSenderName(r.fromUserId)"
+                    [avatarUrl]="requestSenderAvatarUrl(r.fromUserId)"
+                    sizeClass="h-9 w-9"
+                    textClass="text-xs font-semibold"
+                  />
+                  <p class="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
+                    {{ requestSenderName(r.fromUserId) }}
+                  </p>
+                  <button
+                    (click)="acceptRequest(r.fromUserId)"
+                    title="Accept"
+                    class="shrink-0 rounded-lg bg-accent-500 px-2.5 py-1
+                           text-[10px] font-semibold text-white
+                           transition hover:bg-accent-400"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    (click)="declineRequest(r.fromUserId)"
+                    title="Decline"
+                    class="shrink-0 rounded-lg border border-border p-1.5
+                           text-faint-foreground
+                           transition hover:bg-surface-hover hover:text-foreground"
+                  >
+                    <svg appIcon="close" class="h-3.5 w-3.5"></svg>
+                  </button>
+                </div>
+              } @empty {
+                <p class="px-1 py-4 text-center text-[11px] text-faint-foreground">
+                  No new notifications
+                </p>
+              }
+            </div>
+          </div>
+        }
+      </div>
 
       <!-- Divider -->
       <div class="mx-2 h-7 w-px bg-border"></div>

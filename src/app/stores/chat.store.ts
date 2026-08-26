@@ -33,6 +33,11 @@ export class ChatStore {
   // the chat header. Irrelevant at xl+, where the sidebar is always visible
   // regardless of this flag.
   private readonly _mobileInfoOpen = signal(false);
+  // Set by header search when a message result is clicked — Chat reads this
+  // once its history for that chat has loaded, and scrolls/highlights the
+  // message if it's among what got fetched (only the most recent page is
+  // loaded up front, so an older match just falls back to opening the chat).
+  private readonly _pendingHighlight = signal<{ chatId: string; messageId: string } | null>(null);
 
   // "Chats" tab = direct chats + private groups.
   readonly chats = computed(() => this._chats().filter((c) => !c.isGroup || !c.isPublic));
@@ -45,6 +50,7 @@ export class ChatStore {
   readonly directCounterparts = this._directCounterparts.asReadonly();
   // Full member-profile list of the selected chat, including the current user.
   readonly selectedChatMemberProfiles = this._selectedChatMemberProfiles.asReadonly();
+  readonly pendingHighlight = this._pendingHighlight.asReadonly();
 
   // A popular public group can see many joins/leaves in a short burst (e.g.
   // 100 people joining around the same time) — refetching once per event, per
@@ -104,6 +110,17 @@ export class ChatStore {
     this._selectedChatId.set(id);
     this._mobileInfoOpen.set(false);
     void this.hub.joinChatRoom(id).catch(() => {});
+  }
+
+  // Used by header search: open the chat a matched message belongs to, and
+  // remember which message to try to scroll to/highlight once it renders.
+  openMessage(chatId: string, messageId: string): void {
+    this.selectChat(chatId);
+    this._pendingHighlight.set({ chatId, messageId });
+  }
+
+  clearPendingHighlight(): void {
+    this._pendingHighlight.set(null);
   }
 
   closeChat(): void {

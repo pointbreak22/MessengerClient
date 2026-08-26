@@ -19,6 +19,7 @@ export const ApiEndpoints = {
   messages: {
     byChat: (chatId: string) => `/messages/${chatId}`, // GET history / POST send
     markRead: (chatId: string) => `/messages/${chatId}/read`,
+    search: '/messages/search',
   },
   friends: {
     mine: '/friends/me',

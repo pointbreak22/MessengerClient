@@ -3,6 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Avatar } from '../avatar/avatar';
 import { Icon } from '../icon/icon';
 import { ChatStore } from '../../stores/chat.store';
+import { SettingsStore } from '../../stores/settings.store';
 import { UserStore } from '../../stores/user.store';
 import { ChatSummary } from '../../interfaces/chat-summary';
 import { formatLastSeen, getInitials } from '../../shared/user-display';
@@ -18,6 +19,7 @@ type Tab = 'chats' | 'groups' | 'friends';
 export class LeftSidebar {
   private readonly chatStore = inject(ChatStore);
   private readonly userStore = inject(UserStore);
+  private readonly settingsStore = inject(SettingsStore);
 
   private searchDebounce?: ReturnType<typeof setTimeout>;
 
@@ -28,6 +30,11 @@ export class LeftSidebar {
   protected readonly selectedMemberIds = signal<ReadonlySet<string>>(new Set());
   protected readonly showAddFriends = signal(false);
   protected readonly addFriendsQuery = signal('');
+  protected readonly showSettingsPanel = signal(false);
+
+  protected readonly desktopNotifications = this.settingsStore.desktopNotifications;
+  protected readonly soundOnMessage = this.settingsStore.soundOnMessage;
+  protected readonly notificationPermission = this.settingsStore.notificationPermission;
 
   protected readonly chats = this.chatStore.chats;
   protected readonly publicGroups = this.chatStore.publicGroups;
@@ -209,5 +216,22 @@ export class LeftSidebar {
       return;
     }
     this.searchDebounce = setTimeout(() => void this.userStore.searchUsers(value), 300);
+  }
+
+  toggleSettingsPanel(): void {
+    this.showSettingsPanel.update((v) => !v);
+  }
+
+  closeSettingsPanel(): void {
+    this.showSettingsPanel.set(false);
+  }
+
+  toggleDesktopNotifications(): void {
+    if (this.notificationPermission() === 'denied') return;
+    void this.settingsStore.setDesktopNotifications(!this.desktopNotifications());
+  }
+
+  toggleSoundOnMessage(): void {
+    this.settingsStore.setSoundOnMessage(!this.soundOnMessage());
   }
 }

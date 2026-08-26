@@ -49,6 +49,7 @@ export class Chat {
 
   protected readonly draft = signal('');
   protected readonly uploading = signal(false);
+  protected readonly highlightMessageId = signal<string | null>(null);
 
   protected readonly getInitials = getInitials;
   protected readonly formatLastSeen = formatLastSeen;
@@ -63,11 +64,27 @@ export class Chat {
     });
 
     // Keep the thread pinned to the newest message — on chat switch, on
-    // history load, and on every new incoming/outgoing message.
+    // history load, and on every new incoming/outgoing message. Except when a
+    // search result is waiting to be highlighted for this chat: then scroll
+    // to that message instead, once it's actually in the rendered list.
     afterRenderEffect(() => {
-      this.messages();
+      const msgs = this.messages();
       const el = this.messagesContainer?.nativeElement;
-      if (el) el.scrollTop = el.scrollHeight;
+      if (!el) return;
+
+      const pending = this.chatStore.pendingHighlight();
+      if (pending && pending.chatId === this.chat()?.id) {
+        const target = msgs.find((m) => m.id === pending.messageId);
+        this.chatStore.clearPendingHighlight();
+        if (target) {
+          this.highlightMessageId.set(target.id);
+          document.getElementById(`message-${target.id}`)?.scrollIntoView({ block: 'center' });
+          setTimeout(() => this.highlightMessageId.set(null), 2000);
+          return;
+        }
+      }
+
+      el.scrollTop = el.scrollHeight;
     });
   }
 
