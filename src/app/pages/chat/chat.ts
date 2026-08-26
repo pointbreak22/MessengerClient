@@ -105,6 +105,14 @@ export class Chat {
     return message.senderId === this.auth.currentUserProfile()?.id;
   }
 
+  messageBubbleClass(message: ChatMessage): string {
+    const base = this.isOwn(message)
+      ? 'rounded-br-sm bg-gradient-to-br from-accent-500 to-accent2-500 text-white'
+      : 'rounded-bl-sm border border-border bg-surface text-foreground';
+    if (this.highlightMessageId() !== message.id) return base;
+    return `${base} ring-2 ring-accent-400 ring-offset-2 ring-offset-background`;
+  }
+
   senderName(message: ChatMessage): string {
     return this.chatStore.selectedChatMemberProfiles().find((m) => m.id === message.senderId)?.userName ?? '';
   }

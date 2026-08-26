@@ -97,11 +97,8 @@
             }
 
             <div
-              class="rounded-2xl px-4 py-2.5 text-sm leading-5 transition
-                     {{ highlightMessageId() === m.id ? 'ring-2 ring-accent-400 ring-offset-2 ring-offset-background' : '' }}"
-              [class]="isOwn(m)
-                ? 'rounded-br-sm bg-gradient-to-br from-accent-500 to-accent2-500 text-white'
-                : 'rounded-bl-sm border border-border bg-surface text-foreground'"
+              class="rounded-2xl px-4 py-2.5 text-sm leading-5 transition"
+              [class]="messageBubbleClass(m)"
             >
               @if (m.text) {
                 {{ m.text }}
