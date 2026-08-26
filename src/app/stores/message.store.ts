@@ -49,6 +49,7 @@ export class MessageStore {
 
   async markRead(chatId: string): Promise<void> {
     await firstValueFrom(this.api.markRead(chatId));
+    this.chatStore.clearUnread(chatId);
   }
 
   private appendMessage(event: NewMessageEvent): void {
@@ -77,6 +78,7 @@ export class MessageStore {
     const isOpenChat = this.chatStore.selectedChatId() === message.chatId;
     if (isOwnMessage || isOpenChat) return;
 
+    this.chatStore.incrementUnread(message.chatId);
     const senderName = this.userStore.friends().find((f) => f.id === message.senderId)?.userName ?? 'New message';
     this.settings.notifyNewMessage(senderName, message.text ?? 'Sent an attachment');
   }

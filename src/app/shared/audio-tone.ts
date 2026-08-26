@@ -3,9 +3,23 @@
 // short original beeps in a similar spirit (message blip, call rings).
 let sharedCtx: AudioContext | undefined;
 
-function getAudioContext(): AudioContext {
-  sharedCtx ??= new AudioContext();
+function getAudioContext(): AudioContext | undefined {
+  if (sharedCtx) return sharedCtx;
+  if (typeof AudioContext === 'undefined') return undefined;
+  sharedCtx = new AudioContext();
   return sharedCtx;
+}
+
+// Browsers create every AudioContext "suspended" until a real user gesture
+// unlocks it — without this, scheduled tones silently produce no sound (no
+// error either) until the user happens to click/type/tap for some unrelated
+// reason. Grab the first real interaction and resume proactively so it's
+// already unlocked by the time an actual notification needs to play.
+if (typeof document !== 'undefined') {
+  const unlock = () => void getAudioContext()?.resume().catch(() => {});
+  for (const type of ['pointerdown', 'keydown', 'touchstart']) {
+    document.addEventListener(type, unlock, { passive: true });
+  }
 }
 
 export interface ToneStep {
@@ -21,6 +35,8 @@ export interface ToneStep {
 export function playTones(steps: ToneStep[]): void {
   try {
     const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state !== 'running') void ctx.resume();
     for (const step of steps) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();

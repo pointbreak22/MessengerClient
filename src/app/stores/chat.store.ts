@@ -123,6 +123,21 @@ export class ChatStore {
     this._pendingHighlight.set(null);
   }
 
+  // unreadCount only ever arrives via GET /chats/me — nothing pushes updates
+  // to it over SignalR, so MessageStore calls these directly on NewMessage /
+  // markRead so the badge in the chat list reacts without a full refetch.
+  incrementUnread(chatId: string): void {
+    this._chats.update((chats) =>
+      chats.map((c) => (c.id === chatId ? { ...c, unreadCount: c.unreadCount + 1 } : c)),
+    );
+  }
+
+  clearUnread(chatId: string): void {
+    this._chats.update((chats) =>
+      chats.map((c) => (c.id === chatId && c.unreadCount ? { ...c, unreadCount: 0 } : c)),
+    );
+  }
+
   closeChat(): void {
     const previousId = this._selectedChatId();
     if (previousId) void this.hub.leaveChatRoom(previousId).catch(() => {});
