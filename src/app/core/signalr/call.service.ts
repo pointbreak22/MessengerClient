@@ -1,5 +1,6 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { environment } from '../../../environments/environment';
 import { UserApiService } from '../../services/user-api.service';
 import { UserProfile } from '../../interfaces/user-profile';
 import {
@@ -11,8 +12,6 @@ import {
 import { ChatHubService } from './chat-hub.service';
 
 export type CallState = 'idle' | 'outgoing' | 'incoming' | 'connected';
-
-const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 // 1:1 calling only — a group call needs an SFU/media server, not just a
 // signaling relay over SignalR, so it's out of scope here (see chat writeup).
@@ -172,7 +171,7 @@ export class CallService {
   }
 
   private createPeerConnection(remoteUserId: string): RTCPeerConnection {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const pc = new RTCPeerConnection({ iceServers: environment.iceServers });
 
     pc.onicecandidate = (event) => {
       if (!event.candidate) return;
