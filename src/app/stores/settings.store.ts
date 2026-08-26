@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { playTones } from '../shared/audio-tone';
 
 // Client-only preferences — no backend endpoint for these exists, so they're
 // persisted in localStorage rather than synced across devices.
@@ -17,7 +18,6 @@ export class SettingsStore {
   private readonly _permission = signal<NotificationPermission>(
     typeof Notification !== 'undefined' ? Notification.permission : 'denied',
   );
-  private audioCtx?: AudioContext;
 
   readonly desktopNotifications = this._desktopNotifications.asReadonly();
   readonly soundOnMessage = this._soundOnMessage.asReadonly();
@@ -53,23 +53,12 @@ export class SettingsStore {
     }
   }
 
+  // Two quick ascending notes — an original "blip", not a copy of any app's
+  // actual message sound.
   private playChime(): void {
-    try {
-      this.audioCtx ??= new AudioContext();
-      const ctx = this.audioCtx;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.3);
-    } catch {
-      // Browser autoplay/audio policies can silently block this — a missed
-      // chime isn't worth surfacing an error for.
-    }
+    playTones([
+      { freq: 740, start: 0, duration: 0.11 },
+      { freq: 1020, start: 0.09, duration: 0.16 },
+    ]);
   }
 }
