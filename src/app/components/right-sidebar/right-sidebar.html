@@ -122,46 +122,51 @@
       }
 
       @if (chat.isGroup) {
-        <div class="mt-4 flex gap-2">
-          @if (activeGroupCall(); as active) {
-            <button
-              (click)="joinOngoingCall()"
-              [disabled]="groupCall.state() !== 'idle'"
-              class="flex items-center gap-2 rounded-xl border border-online
-                     bg-online/10 px-3 py-2
-                     text-xs font-semibold text-online
-                     transition hover:bg-online/20
-                     disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <svg [appIcon]="active.isVideo ? 'video' : 'call'" class="h-4 w-4"></svg>
-              Join call
-            </button>
-          } @else {
-            <button
-              (click)="openGroupCallPicker(false)"
-              [disabled]="groupCall.state() !== 'idle'"
-              title="Start call"
-              class="flex h-9 w-9 items-center justify-center
-                     rounded-xl border border-border
-                     bg-surface-alt text-faint-foreground
-                     transition hover:bg-surface-hover hover:text-muted-foreground
-                     disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <svg appIcon="call" class="h-4 w-4"></svg>
-            </button>
-            <button
-              (click)="openGroupCallPicker(true)"
-              [disabled]="groupCall.state() !== 'idle'"
-              title="Start video call"
-              class="flex h-9 w-9 items-center justify-center
-                     rounded-xl border border-border
-                     bg-surface-alt text-faint-foreground
-                     transition hover:bg-surface-hover hover:text-muted-foreground
-                     disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <svg appIcon="video" class="h-4 w-4"></svg>
-            </button>
-          }
+        @if (activeGroupCalls().length) {
+          <div class="mt-4 w-full space-y-1.5 px-1">
+            @for (c of activeGroupCalls(); track c.callId) {
+              <button
+                (click)="joinCall(c)"
+                [disabled]="groupCall.state() !== 'idle'"
+                class="flex w-full items-center gap-2 rounded-xl border border-online
+                       bg-online/10 px-3 py-2
+                       text-xs font-semibold text-online
+                       transition hover:bg-online/20
+                       disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <svg [appIcon]="c.isVideo ? 'video' : 'call'" class="h-4 w-4 shrink-0"></svg>
+                <span class="min-w-0 flex-1 truncate text-left">
+                  Join call #{{ c.index }} · {{ c.participantIds.length }} {{ c.participantIds.length === 1 ? 'person' : 'people' }}
+                </span>
+              </button>
+            }
+          </div>
+        }
+        <div class="mt-2 flex gap-2">
+          <button
+            (click)="openGroupCallPicker(false)"
+            [disabled]="groupCall.state() !== 'idle'"
+            title="Start a new call"
+            class="flex h-9 w-9 items-center justify-center
+                   rounded-xl border border-border
+                   bg-surface-alt text-faint-foreground
+                   transition hover:bg-surface-hover hover:text-muted-foreground
+                   disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <svg appIcon="call" class="h-4 w-4"></svg>
+          </button>
+          <button
+            (click)="openGroupCallPicker(true)"
+            [disabled]="groupCall.state() !== 'idle'"
+            title="Start a new video call"
+            class="flex h-9 w-9 items-center justify-center
+                   rounded-xl border border-border
+                   bg-surface-alt text-faint-foreground
+                   transition hover:bg-surface-hover hover:text-muted-foreground
+                   disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <svg appIcon="video" class="h-4 w-4"></svg>
+          </button>
         </div>
       }
 
@@ -242,15 +247,7 @@
                     {{ m.isOnline ? 'Online' : formatLastSeen(m.lastSeenAt) }}
                   </p>
                 </div>
-                @if (callStatus(m.id) !== 'none') {
-                  <svg
-                    appIcon="call"
-                    class="h-3.5 w-3.5 shrink-0"
-                    title="{{ callStatus(m.id) === 'with-me' ? 'On this call' : 'On another call' }}"
-                    [class.text-danger]="callStatus(m.id) === 'with-me'"
-                    [class.text-busy]="callStatus(m.id) === 'busy'"
-                  ></svg>
-                }
+                <app-call-action-icons [userId]="m.id" [chatId]="chat.id" />
                 @if (isOwner()) {
                   <button
                     (click)="removeMember(m.id)"
@@ -399,15 +396,7 @@
                 <p class="truncate text-xs font-medium text-foreground">{{ u.userName }}</p>
                 <p class="truncate text-[10px] text-online">Online</p>
               </div>
-              @if (callStatus(u.id) !== 'none') {
-                <svg
-                  appIcon="call"
-                  class="h-3.5 w-3.5 shrink-0"
-                  title="{{ callStatus(u.id) === 'with-me' ? 'On this call' : 'On another call' }}"
-                  [class.text-danger]="callStatus(u.id) === 'with-me'"
-                  [class.text-busy]="callStatus(u.id) === 'busy'"
-                ></svg>
-              }
+              <app-call-action-icons [userId]="u.id" />
             </button>
           } @empty {
             <p class="px-1 text-xs text-faint-foreground">No one is online right now</p>

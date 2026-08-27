@@ -1,6 +1,7 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { Avatar } from '../avatar/avatar';
+import { CallActionIcons } from '../call-action-icons/call-action-icons';
 import { Icon } from '../icon/icon';
 import { ChatStore } from '../../stores/chat.store';
 import { SettingsStore } from '../../stores/settings.store';
@@ -12,7 +13,7 @@ type Tab = 'chats' | 'groups' | 'friends';
 
 @Component({
   selector: 'app-left-sidebar',
-  imports: [Icon, NgTemplateOutlet, Avatar],
+  imports: [Icon, NgTemplateOutlet, Avatar, CallActionIcons],
   templateUrl: './left-sidebar.html',
   styleUrl: './left-sidebar.css',
 })

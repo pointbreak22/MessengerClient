@@ -1,0 +1,63 @@
+<div class="flex shrink-0 items-center gap-1">
+  @if (joinableCall(); as call) {
+    <button
+      (click)="join(call)"
+      [disabled]="groupCall.state() !== 'idle'"
+      title="Join call #{{ call.index }} · {{ call.participantIds.length }} people"
+      class="relative flex h-6 w-6 items-center justify-center rounded-md text-online
+             transition hover:bg-online/10
+             disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <svg [appIcon]="call.isVideo ? 'video' : 'call'" class="h-3.5 w-3.5"></svg>
+      <span
+        class="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center
+               rounded-full bg-online text-[8px] font-bold text-white"
+      >
+        {{ call.index }}
+      </span>
+    </button>
+  } @else if (badge().status !== 'none') {
+    <div
+      class="flex items-center gap-1"
+      title="{{ badge().status === 'with-me' ? 'On this call' : 'On another call' }}"
+    >
+      <svg
+        appIcon="call"
+        class="h-3.5 w-3.5"
+        [class.text-danger]="badge().status === 'with-me' && !badge().isVideo"
+        [class.text-busy]="badge().status === 'busy' && !badge().isVideo"
+        [class.text-faint-foreground]="badge().isVideo"
+        [class.opacity-40]="badge().isVideo"
+      ></svg>
+      <svg
+        appIcon="video"
+        class="h-3.5 w-3.5"
+        [class.text-danger]="badge().status === 'with-me' && badge().isVideo"
+        [class.text-busy]="badge().status === 'busy' && badge().isVideo"
+        [class.text-faint-foreground]="!badge().isVideo"
+        [class.opacity-40]="!badge().isVideo"
+      ></svg>
+    </div>
+  } @else if (canStartCall()) {
+    <button
+      (click)="startCall(false)"
+      [disabled]="groupCall.state() !== 'idle'"
+      title="Call"
+      class="flex h-6 w-6 items-center justify-center rounded-md text-faint-foreground
+             transition hover:bg-surface-hover hover:text-foreground
+             disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <svg appIcon="call" class="h-3.5 w-3.5"></svg>
+    </button>
+    <button
+      (click)="startCall(true)"
+      [disabled]="groupCall.state() !== 'idle'"
+      title="Video call"
+      class="flex h-6 w-6 items-center justify-center rounded-md text-faint-foreground
+             transition hover:bg-surface-hover hover:text-foreground
+             disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <svg appIcon="video" class="h-3.5 w-3.5"></svg>
+    </button>
+  }
+</div>

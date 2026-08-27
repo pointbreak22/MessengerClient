@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ElementRef, ViewChild, afterRenderEffect, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -7,11 +8,23 @@ import { AuthService } from '../../core/auth/auth.service';
 import { CallService } from '../../core/signalr/call.service';
 import { GroupCallService } from '../../core/signalr/group-call.service';
 import { AttachmentApiService } from '../../services/attachment-api.service';
-import { CallPresenceStore } from '../../stores/call-presence.store';
+import { CallPresenceStore, GroupCallActivity } from '../../stores/call-presence.store';
 import { ChatStore } from '../../stores/chat.store';
 import { MessageStore } from '../../stores/message.store';
 import { ChatMessage } from '../../interfaces/chat-message';
 import { formatLastSeen, formatMessageTime, getInitials } from '../../shared/user-display';
+
+// Mirrors AttachmentsController's limits — checked client-side first so a
+// too-big/wrong-type file fails instantly instead of after a round trip.
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'video/mp4',
+];
 
 @Component({
   selector: 'app-chat',
@@ -49,19 +62,21 @@ export class Chat {
     return !!chat && !chat.isGroup && this.call.state() === 'idle';
   });
 
-  // Group counterpart of canCall — is anyone in this group already on a
-  // call? Drives the green "join ongoing call" affordance in the header.
-  // Suppressed while I'm already on a call myself (mine or one I already
-  // joined) — the full-screen GroupCallOverlay covers that case already.
-  protected readonly activeGroupCall = computed(() => {
+  // Group counterpart of canCall — every call currently running in this
+  // group (there can be more than one in parallel). The header only has
+  // room for a quick "join the first one" shortcut — RightSidebar's Group
+  // info shows the full list with indices for picking a specific one.
+  // Suppressed while I'm already on a call myself — GroupCallOverlay covers
+  // that case full-screen already.
+  protected readonly activeGroupCalls = computed(() => {
     const chat = this.chat();
-    if (!chat?.isGroup || this.groupCall.state() !== 'idle') return null;
-    const memberIds = this.chatStore.selectedChatMemberProfiles().map((m) => m.id);
-    return this.callPresence.activeCallForChat(chat.id, memberIds);
+    if (!chat?.isGroup || this.groupCall.state() !== 'idle') return [];
+    return this.callPresence.activeCallsForChat(chat.id);
   });
 
   protected readonly draft = signal('');
   protected readonly uploading = signal(false);
+  protected readonly uploadError = signal<string | null>(null);
   protected readonly highlightMessageId = signal<string | null>(null);
 
   protected readonly getInitials = getInitials;
@@ -166,10 +181,8 @@ export class Chat {
     this.chatStore.openGroupCallPicker(video);
   }
 
-  joinOngoingCall(): void {
-    const active = this.activeGroupCall();
-    if (!active) return;
-    void this.groupCall.join(active.callId, active.chatId, active.isVideo);
+  joinCall(call: GroupCallActivity): void {
+    void this.groupCall.join(call.callId, call.chatId, call.isVideo);
   }
 
   triggerAttach(): void {
@@ -184,12 +197,37 @@ export class Chat {
     const chat = this.chat();
     if (!file || !chat) return;
 
+    this.uploadError.set(null);
+
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      this.uploadError.set('File exceeds the 20 MB size limit.');
+      return;
+    }
+    if (!ALLOWED_ATTACHMENT_TYPES.includes(file.type)) {
+      this.uploadError.set('That file type isn\'t supported (images, PDF, or MP4 only).');
+      return;
+    }
+
     this.uploading.set(true);
     try {
       const { url } = await firstValueFrom(this.attachmentApi.upload(file));
       await this.messageStore.sendMessage(chat.id, null, url);
+    } catch (err) {
+      this.uploadError.set(this.describeUploadError(err));
     } finally {
       this.uploading.set(false);
     }
+  }
+
+  dismissUploadError(): void {
+    this.uploadError.set(null);
+  }
+
+  private describeUploadError(err: unknown): string {
+    if (err instanceof HttpErrorResponse) {
+      if (typeof err.error === 'string' && err.error.trim()) return err.error;
+      if (err.status === 503) return 'File uploads are temporarily unavailable — try again later.';
+    }
+    return 'Could not send the file. Please try again.';
   }
 }

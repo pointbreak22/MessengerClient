@@ -1,10 +1,11 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Avatar } from '../avatar/avatar';
+import { CallActionIcons } from '../call-action-icons/call-action-icons';
 import { Icon } from '../icon/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { CallService } from '../../core/signalr/call.service';
 import { GroupCallService } from '../../core/signalr/group-call.service';
-import { CallPresenceStatus, CallPresenceStore } from '../../stores/call-presence.store';
+import { CallPresenceStore, GroupCallActivity } from '../../stores/call-presence.store';
 import { ChatStore } from '../../stores/chat.store';
 import { MessageStore } from '../../stores/message.store';
 import { UserStore } from '../../stores/user.store';
@@ -12,7 +13,7 @@ import { formatLastSeen, getInitials } from '../../shared/user-display';
 
 @Component({
   selector: 'app-right-sidebar',
-  imports: [Icon, Avatar],
+  imports: [Icon, Avatar, CallActionIcons],
   templateUrl: './right-sidebar.html',
   styleUrl: './right-sidebar.css',
 })
@@ -62,15 +63,14 @@ export class RightSidebar {
     return this.chatStore.selectedChatMemberProfiles().filter((m) => m.id !== myId);
   });
 
-  // Is anyone in this group already on a call? Drives the green "join
-  // ongoing call" affordance instead of the plain start-call buttons.
-  // Suppressed while I'm already on a call myself — GroupCallOverlay covers
-  // that case full-screen already.
-  protected readonly activeGroupCall = computed(() => {
+  // Every call currently running in this group — there can be more than one
+  // in parallel (first 6 people call each other, another 6 start a separate
+  // one). Suppressed while I'm already on a call myself — GroupCallOverlay
+  // covers that case full-screen already.
+  protected readonly activeGroupCalls = computed(() => {
     const chat = this.selectedChat();
-    if (!chat?.isGroup || this.groupCall.state() !== 'idle') return null;
-    const memberIds = this.chatStore.selectedChatMemberProfiles().map((m) => m.id);
-    return this.callPresence.activeCallForChat(chat.id, memberIds);
+    if (!chat?.isGroup || this.groupCall.state() !== 'idle') return [];
+    return this.callPresence.activeCallsForChat(chat.id);
   });
 
   // Derived from whatever message history is already loaded for this chat —
@@ -99,16 +99,8 @@ export class RightSidebar {
     this.chatStore.openGroupCallPicker(video);
   }
 
-  joinOngoingCall(): void {
-    const active = this.activeGroupCall();
-    if (!active) return;
-    void this.groupCall.join(active.callId, active.chatId, active.isVideo);
-  }
-
-  // Red = sharing a call with me right now, yellow = on some other call,
-  // absent = not on a call.
-  callStatus(userId: string): CallPresenceStatus {
-    return this.callPresence.statusFor(userId, this.groupCall.callId());
+  joinCall(call: GroupCallActivity): void {
+    void this.groupCall.join(call.callId, call.chatId, call.isVideo);
   }
 
   chatName(): string {
