@@ -95,8 +95,8 @@ export class RightSidebar {
     void this.call.startCall(contactId, chat.id, video);
   }
 
-  openGroupCallPicker(): void {
-    this.chatStore.openGroupCallPicker();
+  openGroupCallPicker(video: boolean): void {
+    this.chatStore.openGroupCallPicker(video);
   }
 
   joinOngoingCall(): void {

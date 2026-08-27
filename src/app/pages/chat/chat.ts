@@ -162,8 +162,8 @@ export class Chat {
     void this.call.startCall(counterpartId, chat.id, video);
   }
 
-  openGroupCallPicker(): void {
-    this.chatStore.openGroupCallPicker();
+  openGroupCallPicker(video: boolean): void {
+    this.chatStore.openGroupCallPicker(video);
   }
 
   joinOngoingCall(): void {

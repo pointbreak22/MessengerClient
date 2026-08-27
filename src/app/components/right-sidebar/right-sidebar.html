@@ -138,7 +138,7 @@
             </button>
           } @else {
             <button
-              (click)="openGroupCallPicker()"
+              (click)="openGroupCallPicker(false)"
               [disabled]="groupCall.state() !== 'idle'"
               title="Start call"
               class="flex h-9 w-9 items-center justify-center
@@ -150,7 +150,7 @@
               <svg appIcon="call" class="h-4 w-4"></svg>
             </button>
             <button
-              (click)="openGroupCallPicker()"
+              (click)="openGroupCallPicker(true)"
               [disabled]="groupCall.state() !== 'idle'"
               title="Start video call"
               class="flex h-9 w-9 items-center justify-center

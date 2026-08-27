@@ -39,8 +39,11 @@ export class ChatStore {
   // loaded up front, so an older match just falls back to opening the chat).
   private readonly _pendingHighlight = signal<{ chatId: string; messageId: string } | null>(null);
   // Toggled by the "start group call" buttons in Chat/RightSidebar — read by
-  // GroupCallPicker, which is mounted once in Dashboard.
+  // GroupCallPicker, which is mounted once in Dashboard. Which of the two
+  // buttons (call vs video call) was clicked decides groupCallPickerVideo,
+  // so the picker doesn't need to ask the call-type question a second time.
   private readonly _showGroupCallPicker = signal(false);
+  private readonly _groupCallPickerVideo = signal(false);
 
   // "Chats" tab = direct chats + private groups.
   readonly chats = computed(() => this._chats().filter((c) => !c.isGroup || !c.isPublic));
@@ -55,6 +58,7 @@ export class ChatStore {
   readonly selectedChatMemberProfiles = this._selectedChatMemberProfiles.asReadonly();
   readonly pendingHighlight = this._pendingHighlight.asReadonly();
   readonly showGroupCallPicker = this._showGroupCallPicker.asReadonly();
+  readonly groupCallPickerVideo = this._groupCallPickerVideo.asReadonly();
 
   // A popular public group can see many joins/leaves in a short burst (e.g.
   // 100 people joining around the same time) — refetching once per event, per
@@ -127,7 +131,8 @@ export class ChatStore {
     this._pendingHighlight.set(null);
   }
 
-  openGroupCallPicker(): void {
+  openGroupCallPicker(video: boolean): void {
+    this._groupCallPickerVideo.set(video);
     this._showGroupCallPicker.set(true);
   }
 

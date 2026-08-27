@@ -22,6 +22,7 @@ export class GroupCallPicker {
   private readonly auth = inject(AuthService);
 
   protected readonly show = this.chatStore.showGroupCallPicker;
+  protected readonly isVideo = this.chatStore.groupCallPickerVideo;
   protected readonly chat = this.chatStore.selectedChat;
   protected readonly members = computed(() => {
     const myId = this.auth.currentUserProfile()?.id;
@@ -87,12 +88,13 @@ export class GroupCallPicker {
     this.chatStore.closeGroupCallPicker();
   }
 
-  async call(isVideo: boolean): Promise<void> {
+  async call(): Promise<void> {
     const chat = this.chat();
     const participantIds = [...this.selectedIds()];
     if (!chat || participantIds.length === 0 || this.isOverCap()) return;
 
     const provider = this.registry.get(this.selectedProvider());
+    const isVideo = this.isVideo();
     this.close();
     await provider.start(chat.id, participantIds, isVideo);
   }

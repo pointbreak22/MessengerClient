@@ -74,7 +74,7 @@
           </button>
         } @else {
           <button
-            (click)="openGroupCallPicker()"
+            (click)="openGroupCallPicker(false)"
             [disabled]="groupCall.state() !== 'idle'"
             class="hidden h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:grid"
             title="Call"
@@ -83,7 +83,7 @@
           </button>
 
           <button
-            (click)="openGroupCallPicker()"
+            (click)="openGroupCallPicker(true)"
             [disabled]="groupCall.state() !== 'idle'"
             class="hidden h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:grid"
             title="Video call"
