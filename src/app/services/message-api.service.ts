@@ -40,4 +40,13 @@ export class MessageApiService {
     const params = new HttpParams().set('q', query).set('limit', limit);
     return this.http.get<ChatMessage[]>(`${this.base}${ApiEndpoints.messages.search}`, { params });
   }
+
+  // Own messages only — backend returns 403 for anyone else's.
+  editMessage(messageId: string, text: string): Observable<void> {
+    return this.http.put<void>(`${this.base}${ApiEndpoints.messages.byId(messageId)}`, { text });
+  }
+
+  deleteMessage(messageId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}${ApiEndpoints.messages.byId(messageId)}`);
+  }
 }

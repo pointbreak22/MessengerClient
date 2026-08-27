@@ -79,6 +79,9 @@ export class Chat {
   protected readonly uploading = signal(false);
   protected readonly uploadError = signal<string | null>(null);
   protected readonly highlightMessageId = signal<string | null>(null);
+  protected readonly editingMessageId = signal<string | null>(null);
+  protected readonly editDraft = signal('');
+  protected readonly savingEdit = signal(false);
 
   protected readonly getInitials = getInitials;
   protected readonly formatLastSeen = formatLastSeen;
@@ -126,11 +129,11 @@ export class Chat {
     return chat.isGroup ? (chat.name ?? '') : (this.directCounterparts()[chat.id]?.userName ?? '');
   }
 
-  // null for groups — no group avatar concept, Avatar falls back to initials.
+  // Groups fall back to initials until a custom avatar is set.
   chatAvatarUrl(): string | null {
     const chat = this.chat();
-    if (!chat || chat.isGroup) return null;
-    return this.directCounterparts()[chat.id]?.avatarUrl ?? null;
+    if (!chat) return null;
+    return chat.isGroup ? chat.avatarUrl : (this.directCounterparts()[chat.id]?.avatarUrl ?? null);
   }
 
   isOwn(message: ChatMessage): boolean {
@@ -147,6 +150,39 @@ export class Chat {
 
   senderName(message: ChatMessage): string {
     return this.chatStore.selectedChatMemberProfiles().find((m) => m.id === message.senderId)?.userName ?? '';
+  }
+
+  startEditMessage(message: ChatMessage): void {
+    if (!this.isOwn(message)) return;
+    this.editingMessageId.set(message.id);
+    this.editDraft.set(message.text ?? '');
+  }
+
+  cancelEditMessage(): void {
+    this.editingMessageId.set(null);
+  }
+
+  onEditDraftInput(event: Event): void {
+    this.editDraft.set((event.target as HTMLInputElement).value);
+  }
+
+  async saveEditMessage(message: ChatMessage): Promise<void> {
+    const text = this.editDraft().trim();
+    if (!text || this.savingEdit()) return;
+
+    this.savingEdit.set(true);
+    try {
+      await this.messageStore.editMessage(message.id, text);
+      this.editingMessageId.set(null);
+    } finally {
+      this.savingEdit.set(false);
+    }
+  }
+
+  deleteMessage(message: ChatMessage): void {
+    if (!this.isOwn(message)) return;
+    if (!confirm('Delete this message?')) return;
+    void this.messageStore.deleteMessage(message.id);
   }
 
   send(): void {

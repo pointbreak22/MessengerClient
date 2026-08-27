@@ -55,4 +55,19 @@ export class ChatApiService {
   leaveChat(chatId: string): Observable<void> {
     return this.http.post<void>(`${this.base}${ApiEndpoints.chats.leave(chatId)}`, {});
   }
+
+  // Any member can rename/re-avatar a group, not just the owner.
+  renameChat(chatId: string, name: string): Observable<void> {
+    return this.http.put<void>(`${this.base}${ApiEndpoints.chats.byId(chatId)}`, { name });
+  }
+
+  uploadGroupAvatar(chatId: string, file: File): Observable<{ avatarUrl: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.put<{ avatarUrl: string }>(`${this.base}${ApiEndpoints.chats.avatar(chatId)}`, formData);
+  }
+
+  deleteGroupAvatar(chatId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}${ApiEndpoints.chats.avatar(chatId)}`);
+  }
 }

@@ -121,54 +121,105 @@
 
       @for (m of messages(); track m.id) {
 
-        <div [id]="'message-' + m.id" class="flex" [class]="isOwn(m) ? 'justify-end' : 'justify-start'">
+        <div [id]="'message-' + m.id" class="group flex items-center gap-1" [class]="isOwn(m) ? 'justify-end' : 'justify-start'">
+
+          @if (isOwn(m) && editingMessageId() !== m.id) {
+            <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+              <button
+                (click)="startEditMessage(m)"
+                title="Edit"
+                class="rounded-md p-1 text-faint-foreground transition hover:bg-surface-hover hover:text-foreground"
+              >
+                <svg appIcon="edit" class="h-3 w-3"></svg>
+              </button>
+              <button
+                (click)="deleteMessage(m)"
+                title="Delete"
+                class="rounded-md p-1 text-faint-foreground transition hover:bg-surface-hover hover:text-danger"
+              >
+                <svg appIcon="close" class="h-3 w-3"></svg>
+              </button>
+            </div>
+          }
+
           <div class="max-w-[85%] sm:max-w-[70%]">
 
             @if (!isOwn(m) && c.isGroup) {
               <p class="mb-1 px-1 text-[10px] font-medium text-accent-400">{{ senderName(m) }}</p>
             }
 
-            <div
-              class="rounded-2xl px-4 py-2.5 text-sm leading-5 transition"
-              [class]="messageBubbleClass(m)"
-            >
-              @if (m.text) {
-                {{ m.text }}
-              }
-              @if (m.attachmentUrl; as url) {
-                @switch (attachmentKind(url)) {
-                  @case ('image') {
-                    <a [href]="url" target="_blank" rel="noopener" class="mt-1 block">
-                      <img
-                        [src]="url"
-                        alt="Photo"
-                        class="max-h-64 max-w-full rounded-xl object-cover"
-                      />
-                    </a>
-                  }
-                  @case ('video') {
-                    <video [src]="url" controls preload="metadata" class="mt-1 max-h-64 max-w-full rounded-xl"></video>
-                  }
-                  @default {
-                    <a
-                      [href]="url"
-                      target="_blank"
-                      rel="noopener"
-                      class="mt-1 flex items-center gap-2 rounded-xl border border-border/60 bg-black/10 px-3 py-2 transition hover:bg-black/20"
-                    >
-                      <svg [appIcon]="attachmentIcon(url)" class="h-5 w-5 shrink-0"></svg>
-                      <span class="truncate text-xs font-medium">{{ attachmentLabel(url) }}</span>
-                    </a>
+            @if (editingMessageId() === m.id) {
+              <div class="rounded-2xl border border-accent-500/40 bg-surface px-3 py-2">
+                <input
+                  type="text"
+                  [value]="editDraft()"
+                  (input)="onEditDraftInput($event)"
+                  (keydown.enter)="saveEditMessage(m)"
+                  (keydown.escape)="cancelEditMessage()"
+                  class="w-full bg-transparent text-sm text-foreground outline-none"
+                />
+                <div class="mt-1.5 flex justify-end gap-1.5">
+                  <button
+                    (click)="cancelEditMessage()"
+                    class="rounded-md px-2 py-0.5 text-[10px] font-medium text-faint-foreground transition hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    (click)="saveEditMessage(m)"
+                    [disabled]="savingEdit() || !editDraft().trim()"
+                    class="rounded-md bg-accent-500 px-2 py-0.5 text-[10px] font-semibold text-white transition hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <div
+                class="rounded-2xl px-4 py-2.5 text-sm leading-5 transition"
+                [class]="messageBubbleClass(m)"
+              >
+                @if (m.text) {
+                  {{ m.text }}
+                }
+                @if (m.attachmentUrl; as url) {
+                  @switch (attachmentKind(url)) {
+                    @case ('image') {
+                      <a [href]="url" target="_blank" rel="noopener" class="mt-1 block">
+                        <img
+                          [src]="url"
+                          alt="Photo"
+                          class="max-h-64 max-w-full rounded-xl object-cover"
+                        />
+                      </a>
+                    }
+                    @case ('video') {
+                      <video [src]="url" controls preload="metadata" class="mt-1 max-h-64 max-w-full rounded-xl"></video>
+                    }
+                    @default {
+                      <a
+                        [href]="url"
+                        target="_blank"
+                        rel="noopener"
+                        class="mt-1 flex items-center gap-2 rounded-xl border border-border/60 bg-black/10 px-3 py-2 transition hover:bg-black/20"
+                      >
+                        <svg [appIcon]="attachmentIcon(url)" class="h-5 w-5 shrink-0"></svg>
+                        <span class="truncate text-xs font-medium">{{ attachmentLabel(url) }}</span>
+                      </a>
+                    }
                   }
                 }
-              }
-            </div>
+              </div>
+            }
 
             <p
               class="mt-1 px-1 text-[10px] text-faint-foreground"
               [class]="isOwn(m) ? 'text-right' : 'text-left'"
             >
               {{ formatMessageTime(m.createdAt) }}
+              @if (m.editedAt) {
+                · edited
+              }
             </p>
 
           </div>

@@ -7,7 +7,7 @@ import { ChatStore } from './chat.store';
 import { SettingsStore } from './settings.store';
 import { UserStore } from './user.store';
 import { ChatMessage } from '../interfaces/chat-message';
-import { NewMessageEvent } from '../interfaces/hub-events';
+import { MessageDeletedEvent, MessageEditedEvent, NewMessageEvent } from '../interfaces/hub-events';
 
 @Injectable({ providedIn: 'root' })
 export class MessageStore {
@@ -22,6 +22,8 @@ export class MessageStore {
 
   constructor() {
     this.hub.on<NewMessageEvent>('NewMessage', (event) => this.appendMessage(event));
+    this.hub.on<MessageEditedEvent>('MessageEdited', (event) => this.applyEdit(event));
+    this.hub.on<MessageDeletedEvent>('MessageDeleted', (event) => this.applyDelete(event));
   }
 
   messagesFor(chatId: string): Signal<ChatMessage[]> {
@@ -52,6 +54,20 @@ export class MessageStore {
     this.chatStore.clearUnread(chatId);
   }
 
+  // Own messages only — backend enforces this too. No local mutation here:
+  // the server pushes MessageEdited/MessageDeleted back to every member
+  // including the caller (same non-optimistic reasoning as sendMessage),
+  // and applyEdit()/applyDelete() below react to that.
+  async editMessage(messageId: string, text: string): Promise<void> {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    await firstValueFrom(this.api.editMessage(messageId, trimmed));
+  }
+
+  async deleteMessage(messageId: string): Promise<void> {
+    await firstValueFrom(this.api.deleteMessage(messageId));
+  }
+
   private appendMessage(event: NewMessageEvent): void {
     // The push event has no createdAt — approximate with receive time.
     const message: ChatMessage = {
@@ -61,6 +77,7 @@ export class MessageStore {
       text: event.text,
       attachmentUrl: event.attachmentUrl,
       createdAt: new Date().toISOString(),
+      editedAt: null,
     };
 
     let appended = false;
@@ -81,5 +98,26 @@ export class MessageStore {
     this.chatStore.incrementUnread(message.chatId);
     const senderName = this.userStore.friends().find((f) => f.id === message.senderId)?.userName ?? 'New message';
     this.settings.notifyNewMessage(senderName, message.text ?? 'Sent an attachment');
+  }
+
+  private applyEdit(event: MessageEditedEvent): void {
+    this._messagesByChat.update((byChat) => {
+      const existing = byChat[event.chatId];
+      if (!existing) return byChat;
+      return {
+        ...byChat,
+        [event.chatId]: existing.map((m) =>
+          m.id === event.messageId ? { ...m, text: event.text, editedAt: event.editedAt } : m,
+        ),
+      };
+    });
+  }
+
+  private applyDelete(event: MessageDeletedEvent): void {
+    this._messagesByChat.update((byChat) => {
+      const existing = byChat[event.chatId];
+      if (!existing) return byChat;
+      return { ...byChat, [event.chatId]: existing.filter((m) => m.id !== event.messageId) };
+    });
   }
 }

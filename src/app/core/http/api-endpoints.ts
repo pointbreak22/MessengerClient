@@ -15,11 +15,13 @@ export const ApiEndpoints = {
     public: '/chats/public',
     join: (chatId: string) => `/chats/${chatId}/join`,
     leave: (chatId: string) => `/chats/${chatId}/leave`,
+    avatar: (chatId: string) => `/chats/${chatId}/avatar`,
   },
   messages: {
     byChat: (chatId: string) => `/messages/${chatId}`, // GET history / POST send
     markRead: (chatId: string) => `/messages/${chatId}/read`,
     search: '/messages/search',
+    byId: (messageId: string) => `/messages/${messageId}`, // PUT edit / DELETE
   },
   friends: {
     mine: '/friends/me',

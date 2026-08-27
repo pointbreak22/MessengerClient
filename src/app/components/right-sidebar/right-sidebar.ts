@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
 import { Avatar } from '../avatar/avatar';
 import { CallActionIcons } from '../call-action-icons/call-action-icons';
 import { Icon } from '../icon/icon';
@@ -45,6 +45,14 @@ export class RightSidebar {
   protected readonly showAddMember = signal(false);
   protected readonly addMemberQuery = signal('');
   private addMemberDebounce?: ReturnType<typeof setTimeout>;
+
+  // Name/avatar editing — any member can do this, not just the owner (unlike
+  // remove-member/delete, which stay owner-only below).
+  @ViewChild('groupAvatarInput') private readonly groupAvatarInput!: ElementRef<HTMLInputElement>;
+  protected readonly editingGroupName = signal(false);
+  protected readonly groupNameDraft = signal('');
+  protected readonly savingGroupName = signal(false);
+  protected readonly uploadingGroupAvatar = signal(false);
 
   protected readonly isOwner = computed(() => {
     const chat = this.selectedChat();
@@ -109,11 +117,11 @@ export class RightSidebar {
     return chat.isGroup ? (chat.name ?? '') : (this.selectedChatContact()?.userName ?? '');
   }
 
-  // null for groups — no group avatar concept, Avatar falls back to initials.
+  // Groups fall back to initials until a custom avatar is set.
   chatAvatarUrl(): string | null {
     const chat = this.selectedChat();
-    if (!chat || chat.isGroup) return null;
-    return this.selectedChatContact()?.avatarUrl ?? null;
+    if (!chat) return null;
+    return chat.isGroup ? chat.avatarUrl : (this.selectedChatContact()?.avatarUrl ?? null);
   }
 
   messageFriend(userId: string): void {
@@ -176,5 +184,64 @@ export class RightSidebar {
     const chat = this.selectedChat();
     if (!chat || this.isOwner()) return;
     void this.chatStore.leaveChat(chat.id);
+  }
+
+  startEditGroupName(): void {
+    this.groupNameDraft.set(this.selectedChat()?.name ?? '');
+    this.editingGroupName.set(true);
+  }
+
+  cancelEditGroupName(): void {
+    this.editingGroupName.set(false);
+  }
+
+  onGroupNameDraftInput(event: Event): void {
+    this.groupNameDraft.set((event.target as HTMLInputElement).value);
+  }
+
+  async saveGroupName(): Promise<void> {
+    const chat = this.selectedChat();
+    const name = this.groupNameDraft().trim();
+    if (!chat || !name || this.savingGroupName()) return;
+
+    this.savingGroupName.set(true);
+    try {
+      await this.chatStore.renameChat(chat.id, name);
+      this.editingGroupName.set(false);
+    } finally {
+      this.savingGroupName.set(false);
+    }
+  }
+
+  triggerGroupAvatarUpload(): void {
+    if (this.uploadingGroupAvatar()) return;
+    this.groupAvatarInput.nativeElement.click();
+  }
+
+  async onGroupAvatarSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // allow re-selecting the same file next time
+    const chat = this.selectedChat();
+    if (!file || !chat) return;
+
+    this.uploadingGroupAvatar.set(true);
+    try {
+      await this.chatStore.uploadGroupAvatar(chat.id, file);
+    } finally {
+      this.uploadingGroupAvatar.set(false);
+    }
+  }
+
+  async removeGroupAvatar(): Promise<void> {
+    const chat = this.selectedChat();
+    if (!chat || this.uploadingGroupAvatar()) return;
+
+    this.uploadingGroupAvatar.set(true);
+    try {
+      await this.chatStore.removeGroupAvatar(chat.id);
+    } finally {
+      this.uploadingGroupAvatar.set(false);
+    }
   }
 }

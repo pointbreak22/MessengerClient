@@ -8,6 +8,18 @@ export interface NewMessageEvent {
   attachmentUrl: string | null;
 }
 
+export interface MessageEditedEvent {
+  chatId: string;
+  messageId: string;
+  text: string;
+  editedAt: string;
+}
+
+export interface MessageDeletedEvent {
+  chatId: string;
+  messageId: string;
+}
+
 export interface FriendRequestAcceptedEvent {
   by: string;
 }
@@ -15,4 +27,12 @@ export interface FriendRequestAcceptedEvent {
 export interface AddedToGroupEvent {
   chatId: string;
   chatName: string;
+}
+
+// Sent to every member (not just the one who made the change) whenever a
+// group's name or avatar is updated.
+export interface ChatUpdatedEvent {
+  chatId: string;
+  name: string | null;
+  avatarUrl: string | null;
 }

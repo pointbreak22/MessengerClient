@@ -6,4 +6,5 @@ export interface ChatMessage {
   text: string | null;
   attachmentUrl: string | null;
   createdAt: string;
+  editedAt: string | null;
 }

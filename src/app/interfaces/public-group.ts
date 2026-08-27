@@ -3,6 +3,7 @@
 export interface PublicGroupDto {
   id: string;
   name: string;
+  avatarUrl: string | null;
   memberCount: number;
   isMember: boolean;
 }

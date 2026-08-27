@@ -5,7 +5,7 @@ import { AuthService } from '../core/auth/auth.service';
 import { ChatHubService } from '../core/signalr/chat-hub.service';
 import { ChatApiService } from '../services/chat-api.service';
 import { UserApiService } from '../services/user-api.service';
-import { AddedToGroupEvent } from '../interfaces/hub-events';
+import { AddedToGroupEvent, ChatUpdatedEvent } from '../interfaces/hub-events';
 import { ChatSummary } from '../interfaces/chat-summary';
 import { PublicGroupDto } from '../interfaces/public-group';
 import { UserProfile } from '../interfaces/user-profile';
@@ -90,6 +90,15 @@ export class ChatStore {
     // never races ahead of the write.
     this.hub.on<{ chatId: string }>('GroupMemberRemoved', () => this.scheduleChatsRefresh());
     this.hub.on<{ chatId: string }>('GroupMemberAdded', () => this.scheduleChatsRefresh());
+
+    // Pushed to every member (including whoever made the change) — patched
+    // in directly rather than a full refetch, and reaches the actor too so
+    // renameChat()/uploadGroupAvatar() don't need to update state themselves.
+    this.hub.on<ChatUpdatedEvent>('ChatUpdated', (e) => {
+      this._chats.update((chats) =>
+        chats.map((c) => (c.id === e.chatId ? { ...c, name: e.name, avatarUrl: e.avatarUrl } : c)),
+      );
+    });
 
     effect(() => {
       void this.resolveSelectedChatMembers(this.selectedChat());
@@ -217,6 +226,21 @@ export class ChatStore {
   async leaveChat(chatId: string): Promise<void> {
     await firstValueFrom(this.api.leaveChat(chatId));
     await this.handleGoneChat(chatId);
+  }
+
+  // Any member can rename/re-avatar a group, not just the owner. No local
+  // state mutation here — the ChatUpdated push (sent to every member
+  // including the caller) is what actually updates _chats.
+  async renameChat(chatId: string, name: string): Promise<void> {
+    await firstValueFrom(this.api.renameChat(chatId, name));
+  }
+
+  async uploadGroupAvatar(chatId: string, file: File): Promise<void> {
+    await firstValueFrom(this.api.uploadGroupAvatar(chatId, file));
+  }
+
+  async removeGroupAvatar(chatId: string): Promise<void> {
+    await firstValueFrom(this.api.deleteGroupAvatar(chatId));
   }
 
   private scheduleChatsRefresh(): void {

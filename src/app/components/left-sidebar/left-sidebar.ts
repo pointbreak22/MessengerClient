@@ -88,10 +88,9 @@ export class LeftSidebar {
     return getInitials(this.chatName(chat));
   }
 
-  // null for groups — there's no group avatar concept, Avatar just falls
-  // back to initials in that case.
+  // Groups fall back to initials until a custom avatar is set.
   chatAvatarUrl(chat: ChatSummary): string | null {
-    return chat.isGroup ? null : (this.directCounterparts()[chat.id]?.avatarUrl ?? null);
+    return chat.isGroup ? chat.avatarUrl : (this.directCounterparts()[chat.id]?.avatarUrl ?? null);
   }
 
   chatIsOnline(chat: ChatSummary): boolean {
