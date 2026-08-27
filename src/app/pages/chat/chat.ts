@@ -5,7 +5,9 @@ import { Avatar } from '../../components/avatar/avatar';
 import { Icon } from '../../components/icon/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { CallService } from '../../core/signalr/call.service';
+import { GroupCallService } from '../../core/signalr/group-call.service';
 import { AttachmentApiService } from '../../services/attachment-api.service';
+import { CallPresenceStore } from '../../stores/call-presence.store';
 import { ChatStore } from '../../stores/chat.store';
 import { MessageStore } from '../../stores/message.store';
 import { ChatMessage } from '../../interfaces/chat-message';
@@ -23,6 +25,8 @@ export class Chat {
   private readonly messageStore = inject(MessageStore);
   private readonly attachmentApi = inject(AttachmentApiService);
   protected readonly call = inject(CallService);
+  protected readonly groupCall = inject(GroupCallService);
+  private readonly callPresence = inject(CallPresenceStore);
 
   @ViewChild('fileInput') private readonly fileInput!: ElementRef<HTMLInputElement>;
   @ViewChild('messagesContainer') private readonly messagesContainer?: ElementRef<HTMLDivElement>;
@@ -40,11 +44,20 @@ export class Chat {
     return [...this.messageStore.messagesFor(chat.id)()].reverse();
   });
 
-  // 1:1 only — a group call needs an SFU/media server, not just SignalR
-  // signaling, so calling is limited to direct chats for now.
   protected readonly canCall = computed(() => {
     const chat = this.chat();
     return !!chat && !chat.isGroup && this.call.state() === 'idle';
+  });
+
+  // Group counterpart of canCall — is anyone in this group already on a
+  // call? Drives the green "join ongoing call" affordance in the header.
+  // Suppressed while I'm already on a call myself (mine or one I already
+  // joined) — the full-screen GroupCallOverlay covers that case already.
+  protected readonly activeGroupCall = computed(() => {
+    const chat = this.chat();
+    if (!chat?.isGroup || this.groupCall.state() !== 'idle') return null;
+    const memberIds = this.chatStore.selectedChatMemberProfiles().map((m) => m.id);
+    return this.callPresence.activeCallForChat(chat.id, memberIds);
   });
 
   protected readonly draft = signal('');
@@ -147,6 +160,16 @@ export class Chat {
     const counterpartId = this.directCounterparts()[chat.id]?.id;
     if (!counterpartId) return;
     void this.call.startCall(counterpartId, chat.id, video);
+  }
+
+  openGroupCallPicker(): void {
+    this.chatStore.openGroupCallPicker();
+  }
+
+  joinOngoingCall(): void {
+    const active = this.activeGroupCall();
+    if (!active) return;
+    void this.groupCall.join(active.callId, active.chatId, active.isVideo);
   }
 
   triggerAttach(): void {

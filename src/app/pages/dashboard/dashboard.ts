@@ -1,18 +1,21 @@
 import { Component, OnDestroy, computed, effect, inject } from '@angular/core';
 import { CallOverlay } from '../../components/call-overlay/call-overlay';
+import { GroupCallOverlay } from '../../components/group-call-overlay/group-call-overlay';
+import { GroupCallPicker } from '../../components/group-call-picker/group-call-picker';
 import { Header } from '../../components/header/header';
 import { Icon } from '../../components/icon/icon';
 import { LeftSidebar } from '../../components/left-sidebar/left-sidebar';
 import { RightSidebar } from '../../components/right-sidebar/right-sidebar';
 import { AuthService } from '../../core/auth/auth.service';
 import { ChatHubService } from '../../core/signalr/chat-hub.service';
+import { CallPresenceStore } from '../../stores/call-presence.store';
 import { ChatStore } from '../../stores/chat.store';
 import { UserStore } from '../../stores/user.store';
 import { Chat } from '../chat/chat';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [Header, LeftSidebar, RightSidebar, Chat, Icon, CallOverlay],
+  imports: [Header, LeftSidebar, RightSidebar, Chat, Icon, CallOverlay, GroupCallPicker, GroupCallOverlay],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css',
 })
@@ -21,6 +24,7 @@ export class Dashboard implements OnDestroy {
   private readonly userStore = inject(UserStore);
   private readonly hub = inject(ChatHubService);
   private readonly auth = inject(AuthService);
+  private readonly callPresence = inject(CallPresenceStore);
 
   protected readonly selectedChat = this.chatStore.selectedChat;
   private readonly mobileInfoOpen = this.chatStore.mobileInfoOpen;
@@ -55,6 +59,7 @@ export class Dashboard implements OnDestroy {
     void this.chatStore.loadChats();
     void this.userStore.loadFriends();
     void this.userStore.loadFriendRequests();
+    void this.callPresence.load();
   }
 
   ngOnDestroy(): void {

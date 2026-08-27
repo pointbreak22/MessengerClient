@@ -31,4 +31,8 @@ export const ApiEndpoints = {
   attachments: {
     upload: '/attachments/upload',
   },
+  calls: {
+    active: '/calls/active',
+    providers: '/calls/providers',
+  },
 };

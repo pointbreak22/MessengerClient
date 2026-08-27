@@ -3,6 +3,8 @@ import { Avatar } from '../avatar/avatar';
 import { Icon } from '../icon/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { CallService } from '../../core/signalr/call.service';
+import { GroupCallService } from '../../core/signalr/group-call.service';
+import { CallPresenceStatus, CallPresenceStore } from '../../stores/call-presence.store';
 import { ChatStore } from '../../stores/chat.store';
 import { MessageStore } from '../../stores/message.store';
 import { UserStore } from '../../stores/user.store';
@@ -20,6 +22,8 @@ export class RightSidebar {
   private readonly userStore = inject(UserStore);
   private readonly messageStore = inject(MessageStore);
   protected readonly call = inject(CallService);
+  protected readonly groupCall = inject(GroupCallService);
+  private readonly callPresence = inject(CallPresenceStore);
 
   protected readonly currentUser = this.auth.currentUserProfile;
   protected readonly selectedChat = this.chatStore.selectedChat;
@@ -58,6 +62,17 @@ export class RightSidebar {
     return this.chatStore.selectedChatMemberProfiles().filter((m) => m.id !== myId);
   });
 
+  // Is anyone in this group already on a call? Drives the green "join
+  // ongoing call" affordance instead of the plain start-call buttons.
+  // Suppressed while I'm already on a call myself — GroupCallOverlay covers
+  // that case full-screen already.
+  protected readonly activeGroupCall = computed(() => {
+    const chat = this.selectedChat();
+    if (!chat?.isGroup || this.groupCall.state() !== 'idle') return null;
+    const memberIds = this.chatStore.selectedChatMemberProfiles().map((m) => m.id);
+    return this.callPresence.activeCallForChat(chat.id, memberIds);
+  });
+
   // Derived from whatever message history is already loaded for this chat —
   // there's no dedicated "list attachments" endpoint, so older attachments
   // outside the loaded page of history won't show up here yet.
@@ -78,6 +93,22 @@ export class RightSidebar {
     const contactId = this.selectedChatContact()?.id;
     if (!chat || chat.isGroup || !contactId) return;
     void this.call.startCall(contactId, chat.id, video);
+  }
+
+  openGroupCallPicker(): void {
+    this.chatStore.openGroupCallPicker();
+  }
+
+  joinOngoingCall(): void {
+    const active = this.activeGroupCall();
+    if (!active) return;
+    void this.groupCall.join(active.callId, active.chatId, active.isVideo);
+  }
+
+  // Red = sharing a call with me right now, yellow = on some other call,
+  // absent = not on a call.
+  callStatus(userId: string): CallPresenceStatus {
+    return this.callPresence.statusFor(userId, this.groupCall.callId());
   }
 
   chatName(): string {

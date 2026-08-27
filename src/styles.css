@@ -30,4 +30,7 @@
   --color-online: #22c55e;
   --color-danger: #ef4444;
   --color-danger-600: #dc2626;
+  /* "busy on another call" — distinct from danger (used for destructive
+     actions) and online (idle/available) */
+  --color-busy: #eab308;
 }

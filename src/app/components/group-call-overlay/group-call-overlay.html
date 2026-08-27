@@ -1,0 +1,222 @@
+@if (call.state() === 'idle' && call.errorMessage(); as err) {
+  <div
+    class="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-[calc(100%-2rem)] max-w-sm items-center gap-2
+           rounded-xl border border-danger/30 bg-surface-elevated px-4 py-3 shadow-2xl"
+  >
+    <svg appIcon="phone-off" class="h-4 w-4 shrink-0 text-danger"></svg>
+    <p class="min-w-0 flex-1 text-xs text-foreground">{{ err }}</p>
+    <button
+      (click)="dismissError()"
+      title="Dismiss"
+      class="shrink-0 text-faint-foreground transition hover:text-foreground"
+    >
+      <svg appIcon="close" class="h-3.5 w-3.5"></svg>
+    </button>
+  </div>
+}
+
+@if (call.state() !== 'idle') {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+
+    @if (call.state() === 'incoming' || call.state() === 'outgoing') {
+
+      <!-- Ringing / dialing card -->
+      <div class="w-full max-w-xs rounded-2xl border border-border bg-surface p-6 text-center shadow-2xl">
+
+        @if (call.state() === 'incoming') {
+          <div class="mx-auto w-fit">
+            <app-avatar
+              [name]="call.incomingFromProfile()?.userName"
+              [avatarUrl]="call.incomingFromProfile()?.avatarUrl"
+              sizeClass="h-20 w-20"
+              textClass="text-xl font-semibold"
+              colorClass="bg-gradient-to-br from-accent-500/30 to-accent2-500/30 text-accent-400 ring-4 ring-accent-500/5"
+            />
+          </div>
+          <h3 class="mt-4 text-sm font-semibold text-foreground">
+            {{ call.incomingFromProfile()?.userName ?? '...' }}
+          </h3>
+          <p class="mt-1 text-xs text-muted-foreground">
+            Incoming group {{ call.isVideo() ? 'video ' : '' }}call
+          </p>
+        } @else {
+          <div class="flex justify-center -space-x-3">
+            @for (p of call.invitedProfiles(); track p.id) {
+              <app-avatar
+                [name]="p.userName"
+                [avatarUrl]="p.avatarUrl"
+                sizeClass="h-12 w-12"
+                textClass="text-sm font-semibold"
+                colorClass="bg-gradient-to-br from-accent-500/30 to-accent2-500/30 text-accent-400 ring-2 ring-surface"
+              />
+            }
+          </div>
+          <h3 class="mt-4 text-sm font-semibold text-foreground">
+            Calling {{ call.invitedProfiles().length || '...' }} {{ call.invitedProfiles().length === 1 ? 'person' : 'people' }}
+          </h3>
+          <p class="mt-1 text-xs text-muted-foreground">
+            {{ call.isVideo() ? 'Video call' : 'Call' }}...
+          </p>
+        }
+
+        @if (call.errorMessage()) {
+          <p class="mt-2 text-xs text-danger">{{ call.errorMessage() }}</p>
+        }
+
+        <div class="mt-6 flex items-center justify-center gap-3">
+          @if (call.state() === 'incoming') {
+            <button
+              (click)="accept()"
+              title="Accept"
+              class="flex h-12 w-12 items-center justify-center rounded-full bg-online text-white transition hover:opacity-90"
+            >
+              <svg appIcon="call" class="h-5 w-5"></svg>
+            </button>
+          }
+          <button
+            (click)="decline()"
+            title="Decline"
+            class="flex h-12 w-12 items-center justify-center rounded-full bg-danger text-white transition hover:bg-danger-600"
+          >
+            <svg appIcon="phone-off" class="h-5 w-5"></svg>
+          </button>
+        </div>
+
+      </div>
+
+    } @else {
+
+      <!-- Connected call — grid or speaker view -->
+      <div class="relative flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-surface">
+
+        @if (allTiles().length <= 1) {
+          <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
+            <span class="rounded-full bg-black/50 px-3 py-1 text-[11px] text-white">Waiting for others to join…</span>
+          </div>
+        }
+
+        @if (mode() === 'grid') {
+          <div class="grid flex-1 auto-rows-min grid-cols-2 gap-2 overflow-y-auto p-3 content-start sm:grid-cols-3 lg:grid-cols-4">
+            @for (tile of pagedTiles(); track tile.userId) {
+              <div class="relative aspect-video overflow-hidden rounded-xl">
+                <ng-container *ngTemplateOutlet="tileTpl; context: { $implicit: tile }"></ng-container>
+              </div>
+            }
+          </div>
+
+          @if (totalPages() > 1) {
+            <div class="flex items-center justify-center gap-3 border-t border-border py-2">
+              <button
+                (click)="prevPage()"
+                [disabled]="page() === 0"
+                class="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <svg appIcon="chevron-left" class="h-4 w-4"></svg>
+              </button>
+              <span class="text-xs text-faint-foreground">{{ page() + 1 }} / {{ totalPages() }}</span>
+              <button
+                (click)="nextPage()"
+                [disabled]="page() >= totalPages() - 1"
+                class="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <svg appIcon="chevron-left" class="h-4 w-4 rotate-180"></svg>
+              </button>
+            </div>
+          }
+        } @else {
+          <div class="flex gap-2 overflow-x-auto border-b border-border bg-black/40 p-2">
+            @for (tile of thumbnailTiles(); track tile.userId) {
+              <div class="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg">
+                <ng-container *ngTemplateOutlet="tileTpl; context: { $implicit: tile }"></ng-container>
+              </div>
+            }
+          </div>
+          <div class="relative min-h-0 flex-1 bg-black">
+            @if (speakerTile(); as s) {
+              <ng-container *ngTemplateOutlet="tileTpl; context: { $implicit: s }"></ng-container>
+            }
+          </div>
+        }
+
+        <!-- Controls -->
+        <div class="flex items-center justify-center gap-3 border-t border-border bg-surface p-4">
+          <button
+            (click)="toggleMute()"
+            title="{{ call.localMicMuted() ? 'Unmute' : 'Mute' }}"
+            class="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground transition hover:bg-surface-hover"
+          >
+            <svg [appIcon]="call.localMicMuted() ? 'mic-off' : 'mic'" class="h-4 w-4"></svg>
+          </button>
+
+          @if (call.isVideo()) {
+            <button
+              (click)="toggleCamera()"
+              title="{{ call.localCameraOff() ? 'Turn camera on' : 'Turn camera off' }}"
+              class="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground transition hover:bg-surface-hover"
+            >
+              <svg [appIcon]="call.localCameraOff() ? 'video-off' : 'video'" class="h-4 w-4"></svg>
+            </button>
+          }
+
+          <button
+            (click)="toggleMode()"
+            title="{{ mode() === 'grid' ? 'Speaker view' : 'Grid view' }}"
+            class="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground transition hover:bg-surface-hover"
+          >
+            <svg [appIcon]="mode() === 'grid' ? 'speaker' : 'grid'" class="h-4 w-4"></svg>
+          </button>
+
+          <button
+            (click)="leave()"
+            title="Leave call"
+            class="flex h-11 w-11 items-center justify-center rounded-full bg-danger text-white transition hover:bg-danger-600"
+          >
+            <svg appIcon="phone-off" class="h-4 w-4"></svg>
+          </button>
+        </div>
+
+      </div>
+
+    }
+
+  </div>
+}
+
+<ng-template #tileTpl let-tile>
+  <div
+    class="flex h-full w-full items-center justify-center overflow-hidden rounded-xl bg-surface-alt transition"
+    [class.ring-2]="tile.speaking"
+    [class.ring-online]="tile.speaking"
+  >
+    @if (call.isVideo() && !tile.cameraOff && tile.stream) {
+      <video
+        [srcObject]="tile.stream"
+        autoplay
+        playsinline
+        [muted]="isSelf(tile)"
+        class="h-full w-full object-cover"
+      ></video>
+    } @else {
+      <app-avatar
+        [name]="tile.profile?.userName"
+        [avatarUrl]="tile.profile?.avatarUrl"
+        sizeClass="h-14 w-14"
+        textClass="text-lg font-semibold"
+        colorClass="bg-gradient-to-br from-accent-500/30 to-accent2-500/30 text-accent-400"
+      />
+      @if (!isSelf(tile) && tile.stream) {
+        <audio [srcObject]="tile.stream" autoplay></audio>
+      }
+    }
+
+    <div class="absolute bottom-1 left-1 flex max-w-[calc(100%-0.5rem)] items-center gap-1 rounded-md bg-black/50 px-1.5 py-0.5">
+      <span class="max-w-[6rem] truncate text-[10px] text-white">{{ displayName(tile) }}</span>
+      @if (tile.micMuted) {
+        <svg appIcon="mic-off" class="h-3 w-3 shrink-0 text-white"></svg>
+      }
+      @if (call.isVideo() && tile.cameraOff) {
+        <svg appIcon="video-off" class="h-3 w-3 shrink-0 text-white"></svg>
+      }
+    </div>
+  </div>
+</ng-template>

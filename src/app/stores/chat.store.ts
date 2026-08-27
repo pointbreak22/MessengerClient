@@ -38,6 +38,9 @@ export class ChatStore {
   // message if it's among what got fetched (only the most recent page is
   // loaded up front, so an older match just falls back to opening the chat).
   private readonly _pendingHighlight = signal<{ chatId: string; messageId: string } | null>(null);
+  // Toggled by the "start group call" buttons in Chat/RightSidebar — read by
+  // GroupCallPicker, which is mounted once in Dashboard.
+  private readonly _showGroupCallPicker = signal(false);
 
   // "Chats" tab = direct chats + private groups.
   readonly chats = computed(() => this._chats().filter((c) => !c.isGroup || !c.isPublic));
@@ -51,6 +54,7 @@ export class ChatStore {
   // Full member-profile list of the selected chat, including the current user.
   readonly selectedChatMemberProfiles = this._selectedChatMemberProfiles.asReadonly();
   readonly pendingHighlight = this._pendingHighlight.asReadonly();
+  readonly showGroupCallPicker = this._showGroupCallPicker.asReadonly();
 
   // A popular public group can see many joins/leaves in a short burst (e.g.
   // 100 people joining around the same time) — refetching once per event, per
@@ -121,6 +125,14 @@ export class ChatStore {
 
   clearPendingHighlight(): void {
     this._pendingHighlight.set(null);
+  }
+
+  openGroupCallPicker(): void {
+    this._showGroupCallPicker.set(true);
+  }
+
+  closeGroupCallPicker(): void {
+    this._showGroupCallPicker.set(false);
   }
 
   // unreadCount only ever arrives via GET /chats/me — nothing pushes updates
