@@ -9,6 +9,7 @@ import { CallPresenceStore, GroupCallActivity } from '../../stores/call-presence
 import { ChatStore } from '../../stores/chat.store';
 import { MessageStore } from '../../stores/message.store';
 import { UserStore } from '../../stores/user.store';
+import { attachmentIcon, attachmentKind } from '../../shared/attachment-display';
 import { formatLastSeen, getInitials } from '../../shared/user-display';
 
 @Component({
@@ -84,9 +85,8 @@ export class RightSidebar {
       .filter((m) => !!m.attachmentUrl);
   });
 
-  isImageAttachment(url: string): boolean {
-    return /\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(url);
-  }
+  protected readonly attachmentKind = attachmentKind;
+  protected readonly attachmentIcon = attachmentIcon;
 
   startCall(video: boolean): void {
     const chat = this.selectedChat();

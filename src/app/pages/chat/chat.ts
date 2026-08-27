@@ -12,6 +12,7 @@ import { CallPresenceStore, GroupCallActivity } from '../../stores/call-presence
 import { ChatStore } from '../../stores/chat.store';
 import { MessageStore } from '../../stores/message.store';
 import { ChatMessage } from '../../interfaces/chat-message';
+import { attachmentIcon, attachmentKind, attachmentLabel } from '../../shared/attachment-display';
 import { formatLastSeen, formatMessageTime, getInitials } from '../../shared/user-display';
 
 // Mirrors AttachmentsController's limits — checked client-side first so a
@@ -82,6 +83,9 @@ export class Chat {
   protected readonly getInitials = getInitials;
   protected readonly formatLastSeen = formatLastSeen;
   protected readonly formatMessageTime = formatMessageTime;
+  protected readonly attachmentKind = attachmentKind;
+  protected readonly attachmentLabel = attachmentLabel;
+  protected readonly attachmentIcon = attachmentIcon;
 
   constructor() {
     effect(() => {

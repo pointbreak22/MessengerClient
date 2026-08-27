@@ -320,16 +320,22 @@
               rel="noopener"
               class="group relative aspect-square overflow-hidden rounded-lg bg-surface-alt"
             >
-              @if (isImageAttachment(m.attachmentUrl!)) {
-                <img
-                  [src]="m.attachmentUrl"
-                  alt=""
-                  class="h-full w-full object-cover transition group-hover:opacity-80"
-                />
-              } @else {
-                <div class="flex h-full w-full flex-col items-center justify-center gap-1 text-faint-foreground transition group-hover:text-muted-foreground">
-                  <svg appIcon="attach" class="h-5 w-5"></svg>
-                </div>
+              @switch (attachmentKind(m.attachmentUrl!)) {
+                @case ('image') {
+                  <img
+                    [src]="m.attachmentUrl"
+                    alt=""
+                    class="h-full w-full object-cover transition group-hover:opacity-80"
+                  />
+                }
+                @case ('video') {
+                  <video [src]="m.attachmentUrl" preload="metadata" class="h-full w-full object-cover"></video>
+                }
+                @default {
+                  <div class="flex h-full w-full flex-col items-center justify-center gap-1 text-faint-foreground transition group-hover:text-muted-foreground">
+                    <svg [appIcon]="attachmentIcon(m.attachmentUrl!)" class="h-5 w-5"></svg>
+                  </div>
+                }
               }
             </a>
           } @empty {

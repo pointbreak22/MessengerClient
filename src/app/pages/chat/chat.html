@@ -135,16 +135,32 @@
               @if (m.text) {
                 {{ m.text }}
               }
-              @if (m.attachmentUrl) {
-                <a
-                  [href]="m.attachmentUrl"
-                  target="_blank"
-                  rel="noopener"
-                  class="mt-1 flex items-center gap-1.5 underline underline-offset-2 opacity-90"
-                >
-                  <svg appIcon="attach" class="h-3.5 w-3.5"></svg>
-                  Attachment
-                </a>
+              @if (m.attachmentUrl; as url) {
+                @switch (attachmentKind(url)) {
+                  @case ('image') {
+                    <a [href]="url" target="_blank" rel="noopener" class="mt-1 block">
+                      <img
+                        [src]="url"
+                        alt="Photo"
+                        class="max-h-64 max-w-full rounded-xl object-cover"
+                      />
+                    </a>
+                  }
+                  @case ('video') {
+                    <video [src]="url" controls preload="metadata" class="mt-1 max-h-64 max-w-full rounded-xl"></video>
+                  }
+                  @default {
+                    <a
+                      [href]="url"
+                      target="_blank"
+                      rel="noopener"
+                      class="mt-1 flex items-center gap-2 rounded-xl border border-border/60 bg-black/10 px-3 py-2 transition hover:bg-black/20"
+                    >
+                      <svg [appIcon]="attachmentIcon(url)" class="h-5 w-5 shrink-0"></svg>
+                      <span class="truncate text-xs font-medium">{{ attachmentLabel(url) }}</span>
+                    </a>
+                  }
+                }
               }
             </div>
 
