@@ -100,6 +100,16 @@ export class ChatStore {
       );
     });
 
+    // UserStore.setPresence only patches its own _friends list — this store
+    // caches its own separate UserProfile snapshots (direct-chat counterparts,
+    // selected chat's member list) resolved once via getUserById, which were
+    // never being kept in sync with these events. Without this, the online
+    // dot in a chat header or a group's member list would go stale the moment
+    // you resolved it once, even though the same person's row in the Friends
+    // tab kept updating live.
+    this.hub.on<string>('UserWentOnline', (userId) => this.setMemberPresence(userId, true));
+    this.hub.on<string>('UserWentOffline', (userId) => this.setMemberPresence(userId, false));
+
     effect(() => {
       void this.resolveSelectedChatMembers(this.selectedChat());
     });
@@ -241,6 +251,30 @@ export class ChatStore {
 
   async removeGroupAvatar(chatId: string): Promise<void> {
     await firstValueFrom(this.api.deleteGroupAvatar(chatId));
+  }
+
+  private setMemberPresence(userId: string, isOnline: boolean): void {
+    // _directCounterparts is keyed by chatId, not userId — find the entry
+    // whose counterpart *is* this user (there's at most one, direct chats
+    // are unique per pair).
+    this._directCounterparts.update((map) => {
+      let changed = false;
+      const next: Record<string, UserProfile> = {};
+      for (const [chatId, profile] of Object.entries(map)) {
+        if (profile.id === userId && profile.isOnline !== isOnline) {
+          next[chatId] = { ...profile, isOnline };
+          changed = true;
+        } else {
+          next[chatId] = profile;
+        }
+      }
+      return changed ? next : map;
+    });
+
+    this._selectedChatMemberProfiles.update((list) => {
+      if (!list.some((m) => m.id === userId && m.isOnline !== isOnline)) return list;
+      return list.map((m) => (m.id === userId ? { ...m, isOnline } : m));
+    });
   }
 
   private scheduleChatsRefresh(): void {
