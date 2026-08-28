@@ -40,6 +40,14 @@ export async function getLocalMediaStream(video: boolean, settings: SettingsStor
   }
 }
 
+// toggleMute/toggleCamera on both CallService and GroupCallService reduce to
+// one call to this — the "which boolean signal to flip" part stays with the
+// caller since 1:1 and group calls track it under different signal names.
+export function setMediaTrackEnabled(stream: MediaStream, kind: 'audio' | 'video', enabled: boolean): void {
+  const tracks = kind === 'audio' ? stream.getAudioTracks() : stream.getVideoTracks();
+  for (const track of tracks) track.enabled = enabled;
+}
+
 export interface DeviceOption {
   deviceId: string;
   label: string;

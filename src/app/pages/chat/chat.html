@@ -285,24 +285,26 @@
               </div>
             }
 
-            @if (reactionGroups(m).length > 0) {
-              <div class="mt-1 flex flex-wrap gap-1" [class]="isOwn(m) ? 'justify-end' : 'justify-start'">
-                @for (group of reactionGroups(m); track group.emoji) {
-                  <button
-                    type="button"
-                    (click)="toggleReaction(m.id, group.emoji)"
-                    class="flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] transition"
-                    [class]="group.mine
-                      ? 'border-accent-500/50 bg-accent-500/15 text-accent-400'
-                      : 'border-border bg-surface-alt text-muted-foreground hover:bg-surface-hover'"
-                  >
-                    <span>{{ group.emoji }}</span>
-                    @if (group.count > 1) {
-                      <span>{{ group.count }}</span>
-                    }
-                  </button>
-                }
-              </div>
+            @if (reactionGroups(m); as groups) {
+              @if (groups.length > 0) {
+                <div class="mt-1 flex flex-wrap gap-1" [class]="isOwn(m) ? 'justify-end' : 'justify-start'">
+                  @for (group of groups; track group.emoji) {
+                    <button
+                      type="button"
+                      (click)="toggleReaction(m.id, group.emoji)"
+                      class="flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] transition"
+                      [class]="group.mine
+                        ? 'border-accent-500/50 bg-accent-500/15 text-accent-400'
+                        : 'border-border bg-surface-alt text-muted-foreground hover:bg-surface-hover'"
+                    >
+                      <span>{{ group.emoji }}</span>
+                      @if (group.count > 1) {
+                        <span>{{ group.count }}</span>
+                      }
+                    </button>
+                  }
+                </div>
+              }
             }
 
             <p

@@ -3,8 +3,10 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
 import { UserApiService } from '../../services/user-api.service';
-import { playTones } from '../../shared/audio-tone';
-import { getLocalMediaStream } from '../calling/media-devices';
+import { IceCandidateQueue } from '../calling/ice-candidate-queue';
+import { getLocalMediaStream, setMediaTrackEnabled } from '../calling/media-devices';
+import { createDiagnosticPeerConnection } from '../calling/peer-connection';
+import { Ringer } from '../calling/ringer';
 import { SettingsStore } from '../../stores/settings.store';
 import { GroupCallProvider, GroupCallState, ParticipantState } from '../calling/group-call-provider';
 import {
@@ -41,10 +43,10 @@ export class GroupCallService implements GroupCallProvider {
 
   private localStreamRaw: MediaStream | null = null;
   private readonly peers = new Map<string, RTCPeerConnection>();
-  private readonly pendingIce = new Map<string, RTCIceCandidateInit[]>();
+  private readonly pendingIce = new Map<string, IceCandidateQueue>();
   private readonly speakingAnalysers = new Map<string, { ctx: AudioContext; interval: ReturnType<typeof setInterval> }>();
   private pendingInvite: IncomingGroupCallEvent | null = null;
-  private ringTimer?: ReturnType<typeof setInterval>;
+  private readonly ringer = new Ringer();
 
   private readonly _state = signal<GroupCallState>('idle');
   private readonly _chatId = signal<string | null>(null);
@@ -93,7 +95,7 @@ export class GroupCallService implements GroupCallProvider {
     this._chatId.set(chatId);
     this._isVideo.set(isVideo);
     this._state.set('outgoing');
-    this.startRinging(isVideo);
+    this.ringer.start(isVideo);
 
     try {
       const { stream, videoFallback } = await getLocalMediaStream(isVideo, this.settings);
@@ -107,7 +109,7 @@ export class GroupCallService implements GroupCallProvider {
       const callId = await this.hub.invoke<string>('StartGroupCall', chatId, participantIds, this._isVideo());
       if (!callId) throw new Error('Group call rejected by server');
       this._callId.set(callId);
-      this.stopRinging();
+      this.ringer.stop();
       this._state.set('connected');
 
       void Promise.all(participantIds.map((id) => firstValueFrom(this.userApi.getUserById(id)).catch(() => null))).then(
@@ -160,7 +162,7 @@ export class GroupCallService implements GroupCallProvider {
   toggleMute(): void {
     if (!this.localStreamRaw) return;
     const next = !this._localMicMuted();
-    for (const track of this.localStreamRaw.getAudioTracks()) track.enabled = !next;
+    setMediaTrackEnabled(this.localStreamRaw, 'audio', !next);
     this._localMicMuted.set(next);
     this.broadcastMediaState();
   }
@@ -168,7 +170,7 @@ export class GroupCallService implements GroupCallProvider {
   toggleCamera(): void {
     if (!this.localStreamRaw || !this._isVideo()) return;
     const next = !this._localCameraOff();
-    for (const track of this.localStreamRaw.getVideoTracks()) track.enabled = !next;
+    setMediaTrackEnabled(this.localStreamRaw, 'video', !next);
     this._localCameraOff.set(next);
     this.broadcastMediaState();
   }
@@ -178,7 +180,7 @@ export class GroupCallService implements GroupCallProvider {
   }
 
   private async doJoin(callId: string, chatId: string, isVideo: boolean): Promise<void> {
-    this.stopRinging();
+    this.ringer.stop();
     this._errorMessage.set(null);
     this._chatId.set(chatId);
     this._callId.set(callId);
@@ -214,7 +216,7 @@ export class GroupCallService implements GroupCallProvider {
     this._callId.set(e.callId);
     this._isVideo.set(e.isVideo);
     this._state.set('incoming');
-    this.startRinging(e.isVideo);
+    this.ringer.start(e.isVideo);
 
     void firstValueFrom(this.userApi.getUserById(e.fromUserId))
       .then((profile) => this._incomingFromProfile.set(profile))
@@ -278,18 +280,24 @@ export class GroupCallService implements GroupCallProvider {
     };
     const pc = this.peers.get(e.fromUserId);
     if (!pc?.remoteDescription) {
-      const queue = this.pendingIce.get(e.fromUserId) ?? [];
-      queue.push(candidate);
-      this.pendingIce.set(e.fromUserId, queue);
+      this.queueFor(e.fromUserId).add(candidate);
       return;
     }
     await pc.addIceCandidate(candidate);
   }
 
   private async flushPendingIce(userId: string, pc: RTCPeerConnection): Promise<void> {
-    const queue = this.pendingIce.get(userId) ?? [];
+    await this.pendingIce.get(userId)?.flush(pc);
     this.pendingIce.delete(userId);
-    for (const candidate of queue) await pc.addIceCandidate(candidate);
+  }
+
+  private queueFor(userId: string): IceCandidateQueue {
+    let queue = this.pendingIce.get(userId);
+    if (!queue) {
+      queue = new IceCandidateQueue();
+      this.pendingIce.set(userId, queue);
+    }
+    return queue;
   }
 
   private async connectToPeer(remoteUserId: string): Promise<void> {
@@ -313,7 +321,7 @@ export class GroupCallService implements GroupCallProvider {
 
   private createPeerConnection(remoteUserId: string): RTCPeerConnection {
     this.peers.get(remoteUserId)?.close();
-    const pc = new RTCPeerConnection({ iceServers: environment.iceServers });
+    const pc = createDiagnosticPeerConnection(environment.iceServers, `group-call:${remoteUserId}`);
 
     pc.onicecandidate = (event) => {
       if (!event.candidate) return;
@@ -415,37 +423,8 @@ export class GroupCallService implements GroupCallProvider {
     this.speakingAnalysers.delete(userId);
   }
 
-  // Original synthesized rings (see audio-tone.ts) — same pattern as 1:1
-  // CallService, reused here for consistency rather than re-derived.
-  private startRinging(video: boolean): void {
-    this.stopRinging();
-    const ring = video ? GroupCallService.playVideoRingCycle : GroupCallService.playVoiceRingCycle;
-    ring();
-    this.ringTimer = setInterval(ring, video ? 2600 : 2000);
-  }
-
-  private stopRinging(): void {
-    clearInterval(this.ringTimer);
-    this.ringTimer = undefined;
-  }
-
-  private static playVoiceRingCycle(): void {
-    playTones([
-      { freq: 587, start: 0, duration: 0.18 },
-      { freq: 587, start: 0.26, duration: 0.18 },
-    ]);
-  }
-
-  private static playVideoRingCycle(): void {
-    playTones([
-      { freq: 523, start: 0, duration: 0.16 },
-      { freq: 659, start: 0.18, duration: 0.16 },
-      { freq: 784, start: 0.36, duration: 0.24 },
-    ]);
-  }
-
   private reset(): void {
-    this.stopRinging();
+    this.ringer.stop();
     for (const pc of this.peers.values()) pc.close();
     this.peers.clear();
     this.pendingIce.clear();

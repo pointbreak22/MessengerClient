@@ -3,8 +3,10 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { UserApiService } from '../../services/user-api.service';
 import { UserProfile } from '../../interfaces/user-profile';
-import { playTones } from '../../shared/audio-tone';
-import { getLocalMediaStream } from '../calling/media-devices';
+import { IceCandidateQueue } from '../calling/ice-candidate-queue';
+import { getLocalMediaStream, setMediaTrackEnabled } from '../calling/media-devices';
+import { createDiagnosticPeerConnection } from '../calling/peer-connection';
+import { Ringer } from '../calling/ringer';
 import { SettingsStore } from '../../stores/settings.store';
 import {
   CallAnsweredEvent,
@@ -17,9 +19,6 @@ import { ChatHubService } from './chat-hub.service';
 
 export type CallState = 'idle' | 'outgoing' | 'incoming' | 'connected';
 
-const VOICE_RING_INTERVAL_MS = 2000;
-const VIDEO_RING_INTERVAL_MS = 2600;
-
 // 1:1 calling only — a group call needs an SFU/media server, not just a
 // signaling relay over SignalR, so it's out of scope here (see chat writeup).
 @Injectable({ providedIn: 'root' })
@@ -31,8 +30,8 @@ export class CallService {
   private peerConnection: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
   private pendingOffer: { fromUserId: string; chatId: string; sdp: string } | null = null;
-  private pendingIceCandidates: RTCIceCandidateInit[] = [];
-  private ringTimer?: ReturnType<typeof setInterval>;
+  private readonly pendingIceCandidates = new IceCandidateQueue();
+  private readonly ringer = new Ringer();
 
   readonly state = signal<CallState>('idle');
   // Registered with IActiveCallService server-side as soon as it's known
@@ -90,7 +89,7 @@ export class CallService {
     this.remoteUserId.set(targetUserId);
     this.isVideo.set(video);
     this.state.set('outgoing');
-    this.startRinging(video);
+    this.ringer.start(video);
 
     try {
       const { stream, videoFallback } = await getLocalMediaStream(video, this.settings);
@@ -135,13 +134,13 @@ export class CallService {
       for (const track of stream.getTracks()) pc.addTrack(track, stream);
 
       await pc.setRemoteDescription({ type: 'offer', sdp });
-      await this.flushPendingIceCandidates();
+      await this.pendingIceCandidates.flush(pc);
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
       await this.hub.invoke('AnswerCall', fromUserId, this.callId(), answer.sdp);
-      this.stopRinging();
+      this.ringer.stop();
       this.state.set('connected');
     } catch {
       this.errorMessage.set('Could not answer the call — check camera/microphone permissions.');
@@ -182,14 +181,14 @@ export class CallService {
   toggleMute(): void {
     if (!this.localStream) return;
     const next = !this.muted();
-    for (const track of this.localStream.getAudioTracks()) track.enabled = !next;
+    setMediaTrackEnabled(this.localStream, 'audio', !next);
     this.muted.set(next);
   }
 
   toggleCamera(): void {
     if (!this.localStream || !this.isVideo()) return;
     const next = !this.cameraOff();
-    for (const track of this.localStream.getVideoTracks()) track.enabled = !next;
+    setMediaTrackEnabled(this.localStream, 'video', !next);
     this.cameraOff.set(next);
   }
 
@@ -244,14 +243,14 @@ export class CallService {
     this.remoteUserId.set(e.fromUserId);
     this.isVideo.set(e.isVideo);
     this.state.set('incoming');
-    this.startRinging(e.isVideo);
+    this.ringer.start(e.isVideo);
   }
 
   private async handleCallAnswered(e: CallAnsweredEvent): Promise<void> {
     if (!this.peerConnection || this.state() !== 'outgoing') return;
     await this.peerConnection.setRemoteDescription({ type: 'answer', sdp: e.answerSdp });
-    await this.flushPendingIceCandidates();
-    this.stopRinging();
+    await this.pendingIceCandidates.flush(this.peerConnection);
+    this.ringer.stop();
     this.state.set('connected');
   }
 
@@ -262,22 +261,14 @@ export class CallService {
       sdpMLineIndex: e.sdpMLineIndex ?? undefined,
     };
     if (!this.peerConnection?.remoteDescription) {
-      this.pendingIceCandidates.push(candidate);
+      this.pendingIceCandidates.add(candidate);
       return;
     }
     await this.peerConnection.addIceCandidate(candidate);
   }
 
-  private async flushPendingIceCandidates(): Promise<void> {
-    const queued = this.pendingIceCandidates;
-    this.pendingIceCandidates = [];
-    for (const candidate of queued) {
-      await this.peerConnection?.addIceCandidate(candidate);
-    }
-  }
-
   private createPeerConnection(remoteUserId: string): RTCPeerConnection {
-    const pc = new RTCPeerConnection({ iceServers: environment.iceServers });
+    const pc = createDiagnosticPeerConnection(environment.iceServers, 'call');
 
     pc.onicecandidate = (event) => {
       if (!event.candidate) return;
@@ -288,17 +279,6 @@ export class CallService {
         event.candidate.sdpMid,
         event.candidate.sdpMLineIndex,
       );
-    };
-
-    // Diagnostics only — helps tell apart "signaling/ICE never connects" from
-    // "connects fine but nothing plays" when a call is reported as broken.
-    // Check the browser console (and chrome://webrtc-internals) on both ends.
-    pc.onicecandidateerror = (event) => {
-      const e = event as RTCPeerConnectionIceErrorEvent;
-      console.warn('[call] ICE candidate error', e.errorCode, e.errorText, e.url);
-    };
-    pc.oniceconnectionstatechange = () => {
-      console.debug('[call] iceConnectionState ->', pc.iceConnectionState);
     };
 
     pc.ontrack = (event) => {
@@ -331,44 +311,14 @@ export class CallService {
     return pc;
   }
 
-  // Original synthesized rings, not lifted from any app's actual sound
-  // assets — a short melodic ascending pattern for video (Skype-ish feel), a
-  // sharper double-beep for voice (Discord-ish feel), looped until answered.
-  private startRinging(video: boolean): void {
-    this.stopRinging();
-    const ring = video ? CallService.playVideoRingCycle : CallService.playVoiceRingCycle;
-    ring();
-    this.ringTimer = setInterval(ring, video ? VIDEO_RING_INTERVAL_MS : VOICE_RING_INTERVAL_MS);
-  }
-
-  private stopRinging(): void {
-    clearInterval(this.ringTimer);
-    this.ringTimer = undefined;
-  }
-
-  private static playVoiceRingCycle(): void {
-    playTones([
-      { freq: 587, start: 0, duration: 0.18 },
-      { freq: 587, start: 0.26, duration: 0.18 },
-    ]);
-  }
-
-  private static playVideoRingCycle(): void {
-    playTones([
-      { freq: 523, start: 0, duration: 0.16 },
-      { freq: 659, start: 0.18, duration: 0.16 },
-      { freq: 784, start: 0.36, duration: 0.24 },
-    ]);
-  }
-
   private resetCall(): void {
-    this.stopRinging();
+    this.ringer.stop();
     this.peerConnection?.close();
     this.peerConnection = null;
     for (const track of this.localStream?.getTracks() ?? []) track.stop();
     this.localStream = null;
     this.pendingOffer = null;
-    this.pendingIceCandidates = [];
+    this.pendingIceCandidates.clear();
     this.localMediaStream.set(null);
     this.remoteMediaStream.set(null);
     this.remoteUserId.set(null);

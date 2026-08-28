@@ -24,6 +24,7 @@ export const environment = {
 
     // Mozilla (Firefox Infrastructure)
     { urls: 'stun:stun.services.mozilla.com:3478' },
+    { urls: 'stun:stun.services.mozilla.com' },
 
     // Matrix.org & Nextcloud
     { urls: 'stun:stun.matrix.org:3478' },
