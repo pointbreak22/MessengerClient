@@ -97,6 +97,10 @@ export class LeftSidebar {
     return !chat.isGroup && (this.directCounterparts()[chat.id]?.isOnline ?? false);
   }
 
+  isChatMuted(chat: ChatSummary): boolean {
+    return this.settingsStore.isChatMuted(chat.id);
+  }
+
   setTab(tab: Tab): void {
     this.tab.set(tab);
     if (tab === 'friends') {

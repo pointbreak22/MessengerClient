@@ -260,8 +260,13 @@
 
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
-              <span class="truncate text-[13px] font-medium text-foreground">
-                {{ chatName(chat) }}
+              <span class="flex min-w-0 items-center gap-1">
+                <span class="truncate text-[13px] font-medium text-foreground">
+                  {{ chatName(chat) }}
+                </span>
+                @if (isChatMuted(chat)) {
+                  <svg appIcon="bell-off" class="h-3 w-3 shrink-0 text-faint-foreground"></svg>
+                }
               </span>
               @if (chat.unreadCount) {
                 <span

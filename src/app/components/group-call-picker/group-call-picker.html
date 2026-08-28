@@ -28,13 +28,15 @@
       <div class="mb-4 max-h-64 space-y-0.5 overflow-y-auto">
         @for (m of members(); track m.id) {
           <label
-            class="flex cursor-pointer items-center gap-3 rounded-lg p-2 transition hover:bg-surface-hover"
+            class="flex items-center gap-3 rounded-lg p-2 transition
+                   {{ isMemberBusy(m.id) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-surface-hover' }}"
           >
             <input
               type="checkbox"
               [checked]="isSelected(m.id)"
+              [disabled]="isMemberBusy(m.id)"
               (change)="toggleMember(m.id)"
-              class="h-3.5 w-3.5 shrink-0 rounded border-border accent-accent-500"
+              class="h-3.5 w-3.5 shrink-0 rounded border-border accent-accent-500 disabled:cursor-not-allowed"
             />
             <app-avatar
               [name]="m.userName"
@@ -43,6 +45,9 @@
               textClass="text-[11px] font-semibold"
             />
             <span class="min-w-0 flex-1 truncate text-xs text-foreground">{{ m.userName }}</span>
+            @if (isMemberBusy(m.id)) {
+              <span class="shrink-0 text-[10px] text-busy">Busy</span>
+            }
           </label>
         } @empty {
           <p class="px-1 py-4 text-center text-[11px] text-faint-foreground">No other members in this chat</p>

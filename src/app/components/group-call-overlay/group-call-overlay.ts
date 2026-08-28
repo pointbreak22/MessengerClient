@@ -1,10 +1,15 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { Avatar } from '../avatar/avatar';
 import { Icon } from '../icon/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { ParticipantState } from '../../core/calling/group-call-provider';
 import { GroupCallService } from '../../core/signalr/group-call.service';
+import { UserApiService } from '../../services/user-api.service';
+import { CallPresenceStore } from '../../stores/call-presence.store';
+import { ChatStore } from '../../stores/chat.store';
+import { UserProfile } from '../../interfaces/user-profile';
 import { getInitials } from '../../shared/user-display';
 
 type ViewMode = 'grid' | 'speaker';
@@ -19,11 +24,18 @@ const PAGE_SIZE = 9;
 })
 export class GroupCallOverlay {
   private readonly auth = inject(AuthService);
+  private readonly chatStore = inject(ChatStore);
+  private readonly userApi = inject(UserApiService);
+  private readonly callPresence = inject(CallPresenceStore);
   protected readonly call = inject(GroupCallService);
   protected readonly getInitials = getInitials;
 
   protected readonly mode = signal<ViewMode>('grid');
   protected readonly page = signal(0);
+
+  protected readonly showInvitePanel = signal(false);
+  protected readonly invitableMembers = signal<UserProfile[]>([]);
+  protected readonly invitingUserId = signal<string | null>(null);
 
   private readonly myUserId = computed(() => this.auth.currentUserProfile()?.id ?? 'self');
 
@@ -105,5 +117,49 @@ export class GroupCallOverlay {
 
   toggleCamera(): void {
     this.call.toggleCamera();
+  }
+
+  // Chat membership isn't necessarily the chat currently open in the main
+  // view — the call's own chatId is the source of truth, resolved via
+  // ChatStore.chatById() (unfiltered, unlike the Chats-tab-scoped chats()).
+  async toggleInvitePanel(): Promise<void> {
+    const next = !this.showInvitePanel();
+    this.showInvitePanel.set(next);
+    if (!next) return;
+
+    const chatId = this.call.chatId();
+    const chat = chatId ? this.chatStore.chatById(chatId) : null;
+    if (!chat) {
+      this.invitableMembers.set([]);
+      return;
+    }
+
+    const alreadyPresent = new Set([this.myUserId(), ...Object.keys(this.call.participants())]);
+    const idsToResolve = chat.members.map((m) => m.userId).filter((id) => !alreadyPresent.has(id));
+
+    const profiles = await Promise.all(
+      idsToResolve.map((id) => firstValueFrom(this.userApi.getUserById(id)).catch(() => null)),
+    );
+    this.invitableMembers.set(profiles.filter((p): p is UserProfile => !!p));
+  }
+
+  closeInvitePanel(): void {
+    this.showInvitePanel.set(false);
+  }
+
+  // Someone already on a different call — can't be pulled into two at once.
+  isInviteeBusy(userId: string): boolean {
+    return this.callPresence.badgeFor(userId, this.call.callId()).status === 'busy';
+  }
+
+  async invite(userId: string): Promise<void> {
+    if (this.isInviteeBusy(userId) || this.invitingUserId()) return;
+    this.invitingUserId.set(userId);
+    try {
+      await this.call.invite(userId);
+      this.invitableMembers.update((list) => list.filter((p) => p.id !== userId));
+    } finally {
+      this.invitingUserId.set(null);
+    }
   }
 }

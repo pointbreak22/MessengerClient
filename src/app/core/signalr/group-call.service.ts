@@ -4,6 +4,8 @@ import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
 import { UserApiService } from '../../services/user-api.service';
 import { playTones } from '../../shared/audio-tone';
+import { getLocalMediaStream } from '../calling/media-devices';
+import { SettingsStore } from '../../stores/settings.store';
 import { GroupCallProvider, GroupCallState, ParticipantState } from '../calling/group-call-provider';
 import {
   GroupAnswerReceivedEvent,
@@ -35,6 +37,7 @@ export class GroupCallService implements GroupCallProvider {
   private readonly hub = inject(ChatHubService);
   private readonly userApi = inject(UserApiService);
   private readonly auth = inject(AuthService);
+  private readonly settings = inject(SettingsStore);
 
   private localStreamRaw: MediaStream | null = null;
   private readonly peers = new Map<string, RTCPeerConnection>();
@@ -93,11 +96,15 @@ export class GroupCallService implements GroupCallProvider {
     this.startRinging(isVideo);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
+      const { stream, videoFallback } = await getLocalMediaStream(isVideo, this.settings);
       this.localStreamRaw = stream;
       this._localStream.set(stream);
+      if (videoFallback) {
+        this._isVideo.set(false);
+        this._errorMessage.set('Camera unavailable — joined with audio only.');
+      }
 
-      const callId = await this.hub.invoke<string>('StartGroupCall', chatId, participantIds, isVideo);
+      const callId = await this.hub.invoke<string>('StartGroupCall', chatId, participantIds, this._isVideo());
       if (!callId) throw new Error('Group call rejected by server');
       this._callId.set(callId);
       this.stopRinging();
@@ -140,6 +147,16 @@ export class GroupCallService implements GroupCallProvider {
     this.reset();
   }
 
+  // Bring one more person into the call that's already running — sends them
+  // the same invite the original participants got, for this same callId, so
+  // accepting drops them straight into this room.
+  async invite(targetUserId: string): Promise<void> {
+    const callId = this._callId();
+    const chatId = this._chatId();
+    if (!callId || !chatId || this._state() !== 'connected') return;
+    await this.hub.invoke('InviteToGroupCall', callId, chatId, targetUserId, this._isVideo());
+  }
+
   toggleMute(): void {
     if (!this.localStreamRaw) return;
     const next = !this._localMicMuted();
@@ -169,12 +186,16 @@ export class GroupCallService implements GroupCallProvider {
     this.pendingInvite = null;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
+      const { stream, videoFallback } = await getLocalMediaStream(isVideo, this.settings);
       this.localStreamRaw = stream;
       this._localStream.set(stream);
+      if (videoFallback) {
+        this._isVideo.set(false);
+        this._errorMessage.set('Camera unavailable — joined with audio only.');
+      }
       this._state.set('connected');
 
-      await this.hub.invoke('JoinGroupCall', callId, chatId, isVideo);
+      await this.hub.invoke('JoinGroupCall', callId, chatId, this._isVideo());
       // GroupCallRoster tells us who's already here — handleRoster() does
       // the actual per-peer offers once it arrives.
     } catch {

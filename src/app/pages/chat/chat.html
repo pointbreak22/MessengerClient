@@ -32,13 +32,14 @@
         <p class="truncate text-sm font-semibold text-foreground">{{ chatName() }}</p>
         <p
           class="truncate text-[11px]"
-          [class]="!c.isGroup && directCounterparts()[c.id]?.isOnline ? 'text-online' : 'text-muted-foreground'"
+          [class]="typingLabel() || (!c.isGroup && directCounterparts()[c.id]?.isOnline) ? 'text-online' : 'text-muted-foreground'"
         >
-          {{ c.isGroup
-            ? memberCount() + ' members'
-            : (directCounterparts()[c.id]?.isOnline
-                ? 'Online'
-                : (directCounterparts()[c.id]?.lastSeenAt ? formatLastSeen(directCounterparts()[c.id]!.lastSeenAt) : '')) }}
+          {{ typingLabel()
+              ?? (c.isGroup
+                ? memberCount() + ' members'
+                : (directCounterparts()[c.id]?.isOnline
+                    ? 'Online'
+                    : (directCounterparts()[c.id]?.lastSeenAt ? formatLastSeen(directCounterparts()[c.id]!.lastSeenAt) : ''))) }}
         </p>
       </div>
 
@@ -97,6 +98,14 @@
         }
 
         <button
+          (click)="toggleMute()"
+          class="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+          [title]="isMuted() ? 'Unmute notifications' : 'Mute notifications'"
+        >
+          <svg [appIcon]="isMuted() ? 'bell-off' : 'bell'" class="h-4 w-4"></svg>
+        </button>
+
+        <button
           (click)="openInfo()"
           class="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground xl:hidden"
           title="{{ c.isGroup ? 'Group info' : 'Contact info' }}"
@@ -121,25 +130,76 @@
 
       @for (m of messages(); track m.id) {
 
+        @if (parseCallEvent(m.text); as callEvent) {
+          <div [id]="'message-' + m.id" class="flex items-center justify-center">
+            <span class="flex items-center gap-1.5 rounded-full bg-surface-alt px-3 py-1 text-[11px] text-faint-foreground">
+              <svg [appIcon]="callEvent.isVideo ? 'video-off' : 'phone-off'" class="h-3 w-3"></svg>
+              {{ callEventLabel(callEvent) }} · {{ formatMessageTime(m.createdAt) }}
+            </span>
+          </div>
+        } @else {
+
         <div [id]="'message-' + m.id" class="group flex items-center gap-1" [class]="isOwn(m) ? 'justify-end' : 'justify-start'">
 
-          @if (isOwn(m) && editingMessageId() !== m.id) {
-            <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+          <ng-template #hoverIcons>
+            <div
+              class="relative flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100"
+              [class.opacity-100]="reactingToMessageId() === m.id"
+            >
               <button
-                (click)="startEditMessage(m)"
-                title="Edit"
+                (click)="toggleReactionPicker(m.id)"
+                title="React"
                 class="rounded-md p-1 text-faint-foreground transition hover:bg-surface-hover hover:text-foreground"
               >
-                <svg appIcon="edit" class="h-3 w-3"></svg>
+                <svg appIcon="smile" class="h-3 w-3"></svg>
               </button>
               <button
-                (click)="deleteMessage(m)"
-                title="Delete"
-                class="rounded-md p-1 text-faint-foreground transition hover:bg-surface-hover hover:text-danger"
+                (click)="startReply(m)"
+                title="Reply"
+                class="rounded-md p-1 text-faint-foreground transition hover:bg-surface-hover hover:text-foreground"
               >
-                <svg appIcon="close" class="h-3 w-3"></svg>
+                <svg appIcon="reply" class="h-3 w-3"></svg>
               </button>
+              <button
+                (click)="startForward(m)"
+                title="Forward"
+                class="rounded-md p-1 text-faint-foreground transition hover:bg-surface-hover hover:text-foreground"
+              >
+                <svg appIcon="forward" class="h-3 w-3"></svg>
+              </button>
+              @if (isOwn(m) && editingMessageId() !== m.id) {
+                <button
+                  (click)="startEditMessage(m)"
+                  title="Edit"
+                  class="rounded-md p-1 text-faint-foreground transition hover:bg-surface-hover hover:text-foreground"
+                >
+                  <svg appIcon="edit" class="h-3 w-3"></svg>
+                </button>
+                <button
+                  (click)="deleteMessage(m)"
+                  title="Delete"
+                  class="rounded-md p-1 text-faint-foreground transition hover:bg-surface-hover hover:text-danger"
+                >
+                  <svg appIcon="close" class="h-3 w-3"></svg>
+                </button>
+              }
+
+              @if (reactingToMessageId() === m.id) {
+                <button
+                  type="button"
+                  class="fixed inset-0 z-40 cursor-default"
+                  (click)="closeReactionPicker()"
+                  aria-label="Close emoji picker"
+                ></button>
+                <div class="absolute bottom-full z-50 mb-2" [class]="isOwn(m) ? 'right-0' : 'left-0'">
+                  <app-emoji-picker (pick)="onReactionPicked(m.id, $event)" />
+                </div>
+              }
             </div>
+          </ng-template>
+
+          @if (isOwn(m)) {
+            <ng-container *ngTemplateOutlet="hoverIcons"></ng-container>
           }
 
           <div class="max-w-[85%] sm:max-w-[70%]">
@@ -179,6 +239,19 @@
                 class="rounded-2xl px-4 py-2.5 text-sm leading-5 transition"
                 [class]="messageBubbleClass(m)"
               >
+                @if (m.replyToMessageId; as replyId) {
+                  <button
+                    type="button"
+                    (click)="scrollToMessage(replyId)"
+                    class="mb-1.5 block w-full rounded-lg border-l-2 border-current/40 bg-black/10 px-2 py-1 text-left text-xs opacity-80 transition hover:opacity-100"
+                  >
+                    @if (messageById(replyId); as quoted) {
+                      <span class="block truncate">{{ quoted.text || 'Attachment' }}</span>
+                    } @else {
+                      <span class="block truncate italic">Original message</span>
+                    }
+                  </button>
+                }
                 @if (m.text) {
                   {{ m.text }}
                 }
@@ -212,6 +285,26 @@
               </div>
             }
 
+            @if (reactionGroups(m).length > 0) {
+              <div class="mt-1 flex flex-wrap gap-1" [class]="isOwn(m) ? 'justify-end' : 'justify-start'">
+                @for (group of reactionGroups(m); track group.emoji) {
+                  <button
+                    type="button"
+                    (click)="toggleReaction(m.id, group.emoji)"
+                    class="flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] transition"
+                    [class]="group.mine
+                      ? 'border-accent-500/50 bg-accent-500/15 text-accent-400'
+                      : 'border-border bg-surface-alt text-muted-foreground hover:bg-surface-hover'"
+                  >
+                    <span>{{ group.emoji }}</span>
+                    @if (group.count > 1) {
+                      <span>{{ group.count }}</span>
+                    }
+                  </button>
+                }
+              </div>
+            }
+
             <p
               class="mt-1 px-1 text-[10px] text-faint-foreground"
               [class]="isOwn(m) ? 'text-right' : 'text-left'"
@@ -223,7 +316,13 @@
             </p>
 
           </div>
+
+          @if (!isOwn(m)) {
+            <ng-container *ngTemplateOutlet="hoverIcons"></ng-container>
+          }
         </div>
+
+        }
 
       } @empty {
         <div class="flex h-full items-center justify-center text-xs text-faint-foreground">
@@ -234,7 +333,35 @@
     </div>
 
     <!-- Composer -->
-    <div class="border-t border-border bg-surface px-3 py-3 md:px-4">
+    <div class="relative border-t border-border bg-surface px-3 py-3 md:px-4">
+
+      @if (showEmojiPicker()) {
+        <button
+          type="button"
+          class="fixed inset-0 z-40 cursor-default"
+          (click)="closeEmojiPicker()"
+          aria-label="Close emoji picker"
+        ></button>
+        <div class="absolute bottom-full left-3 z-50 mb-2">
+          <app-emoji-picker (pick)="onEmojiPicked($event)" />
+        </div>
+      }
+
+      @if (replyingTo(); as reply) {
+        <div class="mb-2 flex items-center gap-2 rounded-lg border border-border bg-surface-alt px-3 py-2">
+          <svg appIcon="reply" class="h-3.5 w-3.5 shrink-0 text-accent-400"></svg>
+          <p class="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+            {{ reply.text || 'Attachment' }}
+          </p>
+          <button
+            (click)="cancelReply()"
+            title="Cancel reply"
+            class="shrink-0 text-faint-foreground transition hover:text-foreground"
+          >
+            <svg appIcon="close" class="h-3.5 w-3.5"></svg>
+          </button>
+        </div>
+      }
 
       @if (uploadError(); as err) {
         <div class="mb-2 flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2">
@@ -269,10 +396,19 @@
           <svg appIcon="attach" class="h-[18px] w-[18px]"></svg>
         </button>
 
+        <button
+          type="button"
+          (click)="toggleEmojiPicker()"
+          class="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+          title="Emoji"
+        >
+          <svg appIcon="smile" class="h-[18px] w-[18px]"></svg>
+        </button>
+
         <input
           type="text"
           [ngModel]="draft()"
-          (ngModelChange)="draft.set($event)"
+          (ngModelChange)="setDraft($event)"
           name="draft"
           placeholder="Write a message..."
           class="h-10 w-full rounded-xl
@@ -301,6 +437,57 @@
       </form>
 
     </div>
+
+    @if (forwardingMessage(); as fwd) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div class="flex w-full max-w-sm flex-col rounded-2xl border border-border bg-surface p-5 shadow-2xl">
+
+          <div class="mb-3 flex items-center justify-between">
+            <h3 class="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <svg appIcon="forward" class="h-4 w-4 text-accent-400"></svg>
+              Forward message
+            </h3>
+            <button
+              (click)="cancelForward()"
+              class="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+            >
+              <svg appIcon="close" class="h-4 w-4"></svg>
+            </button>
+          </div>
+
+          <p class="mb-3 truncate rounded-lg border-l-2 border-accent-500/50 bg-surface-alt px-2 py-1 text-xs text-muted-foreground">
+            {{ fwd.text || 'Attachment' }}
+          </p>
+
+          <div class="max-h-64 space-y-0.5 overflow-y-auto">
+            @for (target of forwardTargets(); track target.id) {
+              <button
+                type="button"
+                (click)="forwardTo(target.id)"
+                class="flex w-full items-center gap-3 rounded-lg p-2 text-left transition hover:bg-surface-hover"
+              >
+                <app-avatar
+                  [name]="forwardChatName(target)"
+                  [avatarUrl]="forwardChatAvatarUrl(target)"
+                  sizeClass="h-8 w-8"
+                  textClass="text-[10px] font-semibold"
+                />
+                <span class="truncate text-sm text-foreground">{{ forwardChatName(target) }}</span>
+              </button>
+            } @empty {
+              <p class="px-1 py-2 text-xs text-faint-foreground">No other conversations to forward to.</p>
+            }
+          </div>
+
+        </div>
+      </div>
+    }
+
+    @if (forwarded()) {
+      <div class="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-surface-elevated px-3 py-2 text-xs text-foreground shadow-2xl">
+        Message forwarded.
+      </div>
+    }
 
   }
 

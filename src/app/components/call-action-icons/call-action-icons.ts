@@ -1,4 +1,5 @@
 import { Component, computed, inject, input } from '@angular/core';
+import { CallService } from '../../core/signalr/call.service';
 import { GroupCallService } from '../../core/signalr/group-call.service';
 import { CallPresenceStore, GroupCallActivity } from '../../stores/call-presence.store';
 import { Icon } from '../icon/icon';
@@ -24,13 +25,20 @@ import { Icon } from '../icon/icon';
 })
 export class CallActionIcons {
   private readonly callPresence = inject(CallPresenceStore);
+  private readonly call1to1 = inject(CallService);
   protected readonly groupCall = inject(GroupCallService);
 
   readonly userId = input.required<string>();
   // Omit for a plain friends-list context (informational only, no join/start actions).
   readonly chatId = input<string | null>(null);
 
-  protected readonly badge = computed(() => this.callPresence.badgeFor(this.userId(), this.groupCall.callId()));
+  // Whichever call I'm actually on right now — 1:1 and group calls share the
+  // same presence tracking, so "with-me" (red) has to check both, not just
+  // the group one, or a 1:1 call with this exact contact would show as
+  // yellow ("busy elsewhere") instead of red ("on this call").
+  private readonly myCallId = computed(() => this.groupCall.callId() ?? this.call1to1.callId());
+
+  protected readonly badge = computed(() => this.callPresence.badgeFor(this.userId(), this.myCallId()));
 
   protected readonly joinableCall = computed<GroupCallActivity | null>(() => {
     const chatId = this.chatId();

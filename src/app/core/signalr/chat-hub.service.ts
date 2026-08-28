@@ -81,4 +81,10 @@ export class ChatHubService {
   ): Promise<void> {
     return this.invoke<void>('SendMessage', chatId, text, attachmentUrl, idempotencyKey);
   }
+
+  // Fire-and-forget — a dropped notification just means the "typing..."
+  // indicator is a beat late on the other end, not worth surfacing an error.
+  sendTyping(chatId: string): void {
+    void this.invoke<void>('Typing', chatId).catch(() => {});
+  }
 }

@@ -124,6 +124,13 @@ export class ChatStore {
     });
   }
 
+  // Unfiltered lookup by id — chats() drops public groups you're a member of
+  // (that's the Chats-tab-vs-Groups-tab split), but callers like GroupCallOverlay
+  // need any chat regardless of which tab it'd show up in.
+  chatById(id: string): ChatSummary | null {
+    return this._chats().find((c) => c.id === id) ?? null;
+  }
+
   async loadChats(): Promise<void> {
     const chats = await firstValueFrom(this.api.getChats());
     this._chats.set(chats);

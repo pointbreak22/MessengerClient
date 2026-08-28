@@ -4,11 +4,14 @@ import { environment } from '../../../environments/environment';
 import { UserApiService } from '../../services/user-api.service';
 import { UserProfile } from '../../interfaces/user-profile';
 import { playTones } from '../../shared/audio-tone';
+import { getLocalMediaStream } from '../calling/media-devices';
+import { SettingsStore } from '../../stores/settings.store';
 import {
   CallAnsweredEvent,
   CallEndedEvent,
   IceCandidateEvent,
   IncomingCallEvent,
+  IncomingCallResolvedEvent,
 } from '../../interfaces/call-events';
 import { ChatHubService } from './chat-hub.service';
 
@@ -23,6 +26,7 @@ const VIDEO_RING_INTERVAL_MS = 2600;
 export class CallService {
   private readonly hub = inject(ChatHubService);
   private readonly userApi = inject(UserApiService);
+  private readonly settings = inject(SettingsStore);
 
   private peerConnection: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
@@ -31,6 +35,10 @@ export class CallService {
   private ringTimer?: ReturnType<typeof setInterval>;
 
   readonly state = signal<CallState>('idle');
+  // Registered with IActiveCallService server-side as soon as it's known
+  // (returned by CallUser, or carried on the incoming invite) — this is what
+  // lets 1:1 calls show up in the same busy/presence badges as group calls.
+  readonly callId = signal<string | null>(null);
   readonly isVideo = signal(false);
   readonly remoteUserId = signal<string | null>(null);
   readonly remoteProfile = signal<UserProfile | null>(null);
@@ -44,8 +52,16 @@ export class CallService {
     this.hub.on<IncomingCallEvent>('IncomingCall', (e) => this.handleIncomingCall(e));
     this.hub.on<CallAnsweredEvent>('CallAnswered', (e) => void this.handleCallAnswered(e));
     this.hub.on<IceCandidateEvent>('IceCandidateReceived', (e) => void this.handleRemoteIceCandidate(e));
-    this.hub.on<CallEndedEvent>('CallDeclined', () => this.resetCall());
+    this.hub.on<CallEndedEvent>('CallDeclined', () => {
+      this.errorMessage.set('Call declined.');
+      this.resetCall();
+    });
     this.hub.on<CallEndedEvent>('CallEnded', () => this.resetCall());
+    // Another of my own tabs/devices answered or declined this same invite —
+    // stop ringing here too, without notifying the caller a second time.
+    this.hub.on<IncomingCallResolvedEvent>('IncomingCallResolved', (e) => {
+      if (this.state() === 'incoming' && this.callId() === e.callId) this.resetCall();
+    });
 
     effect(() => {
       const id = this.remoteUserId();
@@ -68,10 +84,14 @@ export class CallService {
     this.startRinging(video);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
+      const { stream, videoFallback } = await getLocalMediaStream(video, this.settings);
       console.debug('[call] local tracks (caller)', stream.getTracks().map((t) => `${t.kind}:${t.enabled}`));
       this.localStream = stream;
       this.localMediaStream.set(stream);
+      if (videoFallback) {
+        this.isVideo.set(false);
+        this.errorMessage.set('Camera unavailable — joined with audio only.');
+      }
 
       const pc = this.createPeerConnection(targetUserId);
       for (const track of stream.getTracks()) pc.addTrack(track, stream);
@@ -79,7 +99,9 @@ export class CallService {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      await this.hub.invoke('CallUser', targetUserId, chatId, offer.sdp, video);
+      const callId = await this.hub.invoke<string>('CallUser', targetUserId, chatId, offer.sdp, this.isVideo());
+      if (!callId) throw new Error('Call rejected by server');
+      this.callId.set(callId);
     } catch {
       this.errorMessage.set('Could not start the call — check camera/microphone permissions.');
       this.resetCall();
@@ -91,10 +113,14 @@ export class CallService {
     const { fromUserId, sdp } = this.pendingOffer;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: this.isVideo() });
+      const { stream, videoFallback } = await getLocalMediaStream(this.isVideo(), this.settings);
       console.debug('[call] local tracks (callee)', stream.getTracks().map((t) => `${t.kind}:${t.enabled}`));
       this.localStream = stream;
       this.localMediaStream.set(stream);
+      if (videoFallback) {
+        this.isVideo.set(false);
+        this.errorMessage.set('Camera unavailable — joined with audio only.');
+      }
 
       const pc = this.createPeerConnection(fromUserId);
       for (const track of stream.getTracks()) pc.addTrack(track, stream);
@@ -105,7 +131,7 @@ export class CallService {
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
-      await this.hub.invoke('AnswerCall', fromUserId, answer.sdp);
+      await this.hub.invoke('AnswerCall', fromUserId, this.callId(), answer.sdp);
       this.stopRinging();
       this.state.set('connected');
     } catch {
@@ -116,13 +142,20 @@ export class CallService {
 
   declineCall(): void {
     const target = this.remoteUserId();
-    if (target) void this.hub.invoke('DeclineCall', target);
+    const callId = this.callId();
+    if (target && callId) void this.hub.invoke('DeclineCall', target, callId);
     this.resetCall();
+  }
+
+  clearError(): void {
+    this.errorMessage.set(null);
   }
 
   hangUp(): void {
     const target = this.remoteUserId();
-    if (target) void this.hub.invoke('EndCall', target);
+    // callId lets the server tell an unanswered outgoing call (→ "Missed
+    // call" in chat history) apart from hanging up a connected one.
+    if (target) void this.hub.invoke('EndCall', target, this.callId());
     this.resetCall();
   }
 
@@ -140,12 +173,54 @@ export class CallService {
     this.cameraOff.set(next);
   }
 
+  // Live device swap mid-call — replaces the track on the existing peer
+  // connection (renegotiation-free) instead of tearing down and restarting
+  // the whole call. Saves the choice as the new default via SettingsStore.
+  async switchCamera(deviceId: string): Promise<void> {
+    this.settings.setPreferredCameraId(deviceId);
+    if (this.state() !== 'connected' || !this.isVideo() || !this.localStream) return;
+    await this.replaceTrack('video', { deviceId: { exact: deviceId } });
+  }
+
+  async switchMic(deviceId: string): Promise<void> {
+    this.settings.setPreferredMicId(deviceId);
+    if (this.state() !== 'connected' || !this.localStream) return;
+    await this.replaceTrack('audio', { deviceId: { exact: deviceId } });
+  }
+
+  private async replaceTrack(kind: 'audio' | 'video', constraint: MediaTrackConstraints): Promise<void> {
+    if (!this.localStream || !this.peerConnection) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(
+        kind === 'video' ? { video: constraint } : { audio: constraint },
+      );
+      const [newTrack] = kind === 'video' ? stream.getVideoTracks() : stream.getAudioTracks();
+      if (!newTrack) return;
+
+      const sender = this.peerConnection.getSenders().find((s) => s.track?.kind === kind);
+      await sender?.replaceTrack(newTrack);
+
+      const oldTracks = kind === 'video' ? this.localStream.getVideoTracks() : this.localStream.getAudioTracks();
+      for (const t of oldTracks) {
+        t.stop();
+        this.localStream.removeTrack(t);
+      }
+      this.localStream.addTrack(newTrack);
+      // Same MediaStream instance mutated in place — re-set so the <video>/
+      // <audio> element's bound signal actually re-renders with the new track.
+      this.localMediaStream.set(this.localStream);
+    } catch {
+      this.errorMessage.set(`Could not switch ${kind === 'video' ? 'camera' : 'microphone'}.`);
+    }
+  }
+
   private handleIncomingCall(e: IncomingCallEvent): void {
     if (this.state() !== 'idle') {
-      void this.hub.invoke('DeclineCall', e.fromUserId);
+      void this.hub.invoke('DeclineCall', e.fromUserId, e.callId);
       return;
     }
     this.pendingOffer = { fromUserId: e.fromUserId, chatId: e.chatId, sdp: e.offerSdp };
+    this.callId.set(e.callId);
     this.remoteUserId.set(e.fromUserId);
     this.isVideo.set(e.isVideo);
     this.state.set('incoming');
@@ -220,7 +295,10 @@ export class CallService {
 
     pc.onconnectionstatechange = () => {
       console.debug('[call] connectionState ->', pc.connectionState);
-      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+      if (pc.connectionState === 'failed') {
+        this.errorMessage.set('Call connection lost.');
+        this.resetCall();
+      } else if (pc.connectionState === 'closed') {
         this.resetCall();
       }
     };
@@ -273,6 +351,14 @@ export class CallService {
     this.muted.set(false);
     this.cameraOff.set(false);
     this.isVideo.set(false);
+
+    // Best-effort — regardless of why we're resetting (my own hangup, remote
+    // decline/end, ICE failure), tell the server I'm done with this call so
+    // I stop showing up as "busy" wherever presence badges render.
+    const callId = this.callId();
+    if (callId) void this.hub.invoke('LeaveCall', callId);
+    this.callId.set(null);
+
     this.state.set('idle');
   }
 }

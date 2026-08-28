@@ -1,0 +1,31 @@
+<div class="w-64 rounded-2xl border border-border bg-surface-elevated p-3 shadow-2xl shadow-black/30">
+
+  @if (showCamera()) {
+    <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+      Camera
+    </label>
+    <select
+      [value]="preferredCameraId() ?? ''"
+      (change)="onCameraSelect($event)"
+      class="mb-3 w-full rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-xs text-foreground outline-none"
+    >
+      @for (cam of cameras(); track cam.deviceId) {
+        <option [value]="cam.deviceId">{{ cam.label }}</option>
+      }
+    </select>
+  }
+
+  <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+    Microphone
+  </label>
+  <select
+    [value]="preferredMicId() ?? ''"
+    (change)="onMicSelect($event)"
+    class="w-full rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-xs text-foreground outline-none"
+  >
+    @for (mic of mics(); track mic.deviceId) {
+      <option [value]="mic.deviceId">{{ mic.label }}</option>
+    }
+  </select>
+
+</div>

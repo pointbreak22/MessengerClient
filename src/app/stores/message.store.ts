@@ -7,7 +7,12 @@ import { ChatStore } from './chat.store';
 import { SettingsStore } from './settings.store';
 import { UserStore } from './user.store';
 import { ChatMessage } from '../interfaces/chat-message';
-import { MessageDeletedEvent, MessageEditedEvent, NewMessageEvent } from '../interfaces/hub-events';
+import {
+  MessageDeletedEvent,
+  MessageEditedEvent,
+  MessageReactionsChangedEvent,
+  NewMessageEvent,
+} from '../interfaces/hub-events';
 
 @Injectable({ providedIn: 'root' })
 export class MessageStore {
@@ -24,6 +29,7 @@ export class MessageStore {
     this.hub.on<NewMessageEvent>('NewMessage', (event) => this.appendMessage(event));
     this.hub.on<MessageEditedEvent>('MessageEdited', (event) => this.applyEdit(event));
     this.hub.on<MessageDeletedEvent>('MessageDeleted', (event) => this.applyDelete(event));
+    this.hub.on<MessageReactionsChangedEvent>('MessageReactionsChanged', (event) => this.applyReactions(event));
   }
 
   messagesFor(chatId: string): Signal<ChatMessage[]> {
@@ -42,10 +48,20 @@ export class MessageStore {
   // is the low-latency SignalR alternative for later. Either way the server
   // pushes NewMessage back to every member including the sender, so this
   // deliberately does not optimistically append — appendMessage() handles it.
-  async sendMessage(chatId: string, text: string | null, attachmentUrl: string | null = null): Promise<void> {
+  async sendMessage(
+    chatId: string,
+    text: string | null,
+    attachmentUrl: string | null = null,
+    replyToMessageId: string | null = null,
+  ): Promise<void> {
     if (!text && !attachmentUrl) return;
     await firstValueFrom(
-      this.api.sendMessage(chatId, { text, attachmentUrl, idempotencyKey: crypto.randomUUID() }),
+      this.api.sendMessage(chatId, {
+        text,
+        attachmentUrl,
+        idempotencyKey: crypto.randomUUID(),
+        replyToMessageId,
+      }),
     );
   }
 
@@ -68,6 +84,13 @@ export class MessageStore {
     await firstValueFrom(this.api.deleteMessage(messageId));
   }
 
+  // Non-optimistic like everything else here — the server pushes
+  // MessageReactionsChanged back to every member including the caller,
+  // and applyReactions() below reacts to that.
+  async toggleReaction(messageId: string, emoji: string): Promise<void> {
+    await firstValueFrom(this.api.toggleReaction(messageId, emoji));
+  }
+
   private appendMessage(event: NewMessageEvent): void {
     // The push event has no createdAt — approximate with receive time.
     const message: ChatMessage = {
@@ -78,6 +101,8 @@ export class MessageStore {
       attachmentUrl: event.attachmentUrl,
       createdAt: new Date().toISOString(),
       editedAt: null,
+      reactions: [],
+      replyToMessageId: event.replyToMessageId,
     };
 
     let appended = false;
@@ -97,7 +122,7 @@ export class MessageStore {
 
     this.chatStore.incrementUnread(message.chatId);
     const senderName = this.userStore.friends().find((f) => f.id === message.senderId)?.userName ?? 'New message';
-    this.settings.notifyNewMessage(senderName, message.text ?? 'Sent an attachment');
+    this.settings.notifyNewMessage(message.chatId, senderName, message.text ?? 'Sent an attachment');
   }
 
   private applyEdit(event: MessageEditedEvent): void {
@@ -118,6 +143,19 @@ export class MessageStore {
       const existing = byChat[event.chatId];
       if (!existing) return byChat;
       return { ...byChat, [event.chatId]: existing.filter((m) => m.id !== event.messageId) };
+    });
+  }
+
+  private applyReactions(event: MessageReactionsChangedEvent): void {
+    this._messagesByChat.update((byChat) => {
+      const existing = byChat[event.chatId];
+      if (!existing) return byChat;
+      return {
+        ...byChat,
+        [event.chatId]: existing.map((m) =>
+          m.id === event.messageId ? { ...m, reactions: event.reactions } : m,
+        ),
+      };
     });
   }
 }

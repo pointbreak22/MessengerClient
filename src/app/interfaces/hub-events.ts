@@ -6,6 +6,7 @@ export interface NewMessageEvent {
   senderId: string;
   text: string | null;
   attachmentUrl: string | null;
+  replyToMessageId: string | null;
 }
 
 export interface MessageEditedEvent {
@@ -18,6 +19,12 @@ export interface MessageEditedEvent {
 export interface MessageDeletedEvent {
   chatId: string;
   messageId: string;
+}
+
+export interface MessageReactionsChangedEvent {
+  chatId: string;
+  messageId: string;
+  reactions: { emoji: string; userId: string }[];
 }
 
 export interface FriendRequestAcceptedEvent {

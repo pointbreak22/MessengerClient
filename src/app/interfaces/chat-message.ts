@@ -1,3 +1,8 @@
+export interface MessageReaction {
+  emoji: string;
+  userId: string;
+}
+
 // API shape (GET /messages/{chatId}, POST /messages/{chatId}, NewMessage event).
 export interface ChatMessage {
   id: string;
@@ -7,4 +12,6 @@ export interface ChatMessage {
   attachmentUrl: string | null;
   createdAt: string;
   editedAt: string | null;
+  reactions: MessageReaction[];
+  replyToMessageId: string | null;
 }

@@ -89,6 +89,15 @@
       <!-- Connected call — grid or speaker view -->
       <div class="relative flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-surface">
 
+        @if (call.errorMessage(); as err) {
+          <div class="flex items-center gap-2 border-b border-danger/30 bg-danger/10 px-4 py-2">
+            <p class="min-w-0 flex-1 text-xs text-danger">{{ err }}</p>
+            <button (click)="dismissError()" title="Dismiss" class="shrink-0 text-danger/70 transition hover:text-danger">
+              <svg appIcon="close" class="h-3.5 w-3.5"></svg>
+            </button>
+          </div>
+        }
+
         @if (allTiles().length <= 1) {
           <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
             <span class="rounded-full bg-black/50 px-3 py-1 text-[11px] text-white">Waiting for others to join…</span>
@@ -167,6 +176,14 @@
           </button>
 
           <button
+            (click)="toggleInvitePanel()"
+            title="Add someone to this call"
+            class="flex h-11 w-11 items-center justify-center rounded-full border border-border text-foreground transition hover:bg-surface-hover"
+          >
+            <svg appIcon="plus" class="h-4 w-4"></svg>
+          </button>
+
+          <button
             (click)="leave()"
             title="Leave call"
             class="flex h-11 w-11 items-center justify-center rounded-full bg-danger text-white transition hover:bg-danger-600"
@@ -174,6 +191,54 @@
             <svg appIcon="phone-off" class="h-4 w-4"></svg>
           </button>
         </div>
+
+        @if (showInvitePanel()) {
+          <button
+            (click)="closeInvitePanel()"
+            class="fixed inset-0 z-10 cursor-default"
+            aria-label="Close"
+          ></button>
+
+          <div
+            class="absolute bottom-20 left-1/2 z-20 w-72 -translate-x-1/2
+                   rounded-2xl border border-border bg-surface-elevated p-3
+                   shadow-2xl shadow-black/30"
+          >
+            <p class="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+              Add to this call
+            </p>
+
+            <div class="max-h-56 space-y-0.5 overflow-y-auto">
+              @for (p of invitableMembers(); track p.id) {
+                <div class="flex items-center gap-3 rounded-lg p-1.5">
+                  <app-avatar
+                    [name]="p.userName"
+                    [avatarUrl]="p.avatarUrl"
+                    sizeClass="h-8 w-8"
+                    textClass="text-[11px] font-semibold"
+                  />
+                  <span class="min-w-0 flex-1 truncate text-xs text-foreground">{{ p.userName }}</span>
+                  @if (isInviteeBusy(p.id)) {
+                    <span class="shrink-0 text-[10px] text-busy">Busy</span>
+                  } @else {
+                    <button
+                      (click)="invite(p.id)"
+                      [disabled]="invitingUserId() === p.id"
+                      title="Add"
+                      class="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-accent-500 text-white transition hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <svg appIcon="plus" class="h-3.5 w-3.5"></svg>
+                    </button>
+                  }
+                </div>
+              } @empty {
+                <p class="px-1 py-4 text-center text-[11px] text-faint-foreground">
+                  No one else free to add right now
+                </p>
+              }
+            </div>
+          </div>
+        }
 
       </div>
 

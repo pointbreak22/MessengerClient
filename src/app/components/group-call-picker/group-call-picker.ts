@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CallsApiService } from '../../services/calls-api.service';
+import { CallPresenceStore } from '../../stores/call-presence.store';
 import { ChatStore } from '../../stores/chat.store';
 import { Avatar } from '../avatar/avatar';
 import { Icon } from '../icon/icon';
@@ -20,6 +21,7 @@ export class GroupCallPicker {
   private readonly registry = inject(GroupCallRegistry);
   private readonly callsApi = inject(CallsApiService);
   private readonly auth = inject(AuthService);
+  private readonly callPresence = inject(CallPresenceStore);
 
   protected readonly show = this.chatStore.showGroupCallPicker;
   protected readonly isVideo = this.chatStore.groupCallPickerVideo;
@@ -50,7 +52,15 @@ export class GroupCallPicker {
     return this.selectedIds().has(userId);
   }
 
+  // Already on some call (any call, not necessarily one I'm in — I'm not on
+  // one yet, this picker is how I'd start one) — can't call someone twice at
+  // once, so they're not selectable here.
+  isMemberBusy(userId: string): boolean {
+    return this.callPresence.badgeFor(userId, null).status !== 'none';
+  }
+
   toggleMember(userId: string): void {
+    if (this.isMemberBusy(userId)) return;
     this.selectedIds.update((ids) => {
       const next = new Set(ids);
       if (next.has(userId)) next.delete(userId);
@@ -60,7 +70,7 @@ export class GroupCallPicker {
   }
 
   selectAll(): void {
-    this.selectedIds.set(new Set(this.members().map((m) => m.id)));
+    this.selectedIds.set(new Set(this.members().filter((m) => !this.isMemberBusy(m.id)).map((m) => m.id)));
   }
 
   isProviderAvailable(kind: GroupCallProviderKind): boolean {

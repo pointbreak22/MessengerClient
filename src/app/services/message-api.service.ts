@@ -3,12 +3,13 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { ApiEndpoints } from '../core/http/api-endpoints';
-import { ChatMessage } from '../interfaces/chat-message';
+import { ChatMessage, MessageReaction } from '../interfaces/chat-message';
 
 export interface SendMessageRequest {
   text?: string | null;
   attachmentUrl?: string | null;
   idempotencyKey?: string;
+  replyToMessageId?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -48,5 +49,11 @@ export class MessageApiService {
 
   deleteMessage(messageId: string): Observable<void> {
     return this.http.delete<void>(`${this.base}${ApiEndpoints.messages.byId(messageId)}`);
+  }
+
+  // Toggle: same emoji again removes it, a different one replaces it — one
+  // reaction per user per message. Returns the message's full reaction list.
+  toggleReaction(messageId: string, emoji: string): Observable<MessageReaction[]> {
+    return this.http.put<MessageReaction[]>(`${this.base}${ApiEndpoints.messages.reactions(messageId)}`, { emoji });
   }
 }

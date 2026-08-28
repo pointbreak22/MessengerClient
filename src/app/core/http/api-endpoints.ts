@@ -22,6 +22,7 @@ export const ApiEndpoints = {
     markRead: (chatId: string) => `/messages/${chatId}/read`,
     search: '/messages/search',
     byId: (messageId: string) => `/messages/${messageId}`, // PUT edit / DELETE
+    reactions: (messageId: string) => `/messages/${messageId}/reactions`, // PUT toggle
   },
   friends: {
     mine: '/friends/me',
