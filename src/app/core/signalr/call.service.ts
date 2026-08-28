@@ -161,10 +161,21 @@ export class CallService {
   }
 
   hangUp(): void {
+    this.endCallLocally();
+  }
+
+  // Local-side termination that also tells the other party — for any reason
+  // *we* decide the call is over that they don't already know about (manual
+  // hangup, or ICE giving up after connectivity failure). Deliberately not
+  // folded into resetCall() itself: resetCall() also runs in REACTION to a
+  // CallEnded/CallDeclined we just received *from* them, and re-sending
+  // EndCall there would just bounce a notification back and forth.
+  private endCallLocally(): void {
     const target = this.remoteUserId();
+    const callId = this.callId();
     // callId lets the server tell an unanswered outgoing call (→ "Missed
     // call" in chat history) apart from hanging up a connected one.
-    if (target) void this.hub.invoke('EndCall', target, this.callId());
+    if (target) void this.hub.invoke('EndCall', target, callId);
     this.resetCall();
   }
 
@@ -304,11 +315,15 @@ export class CallService {
 
     pc.onconnectionstatechange = () => {
       console.debug('[call] connectionState ->', pc.connectionState);
+      // Both branches must tell the other party (endCallLocally, not a bare
+      // resetCall()) — otherwise only the side that noticed the failure
+      // resets, and the other one is left stuck showing a "connected"/
+      // "calling..." screen for a call that's actually dead on both ends.
       if (pc.connectionState === 'failed') {
         this.errorMessage.set('Call connection lost.');
-        this.resetCall();
+        this.endCallLocally();
       } else if (pc.connectionState === 'closed') {
-        this.resetCall();
+        this.endCallLocally();
       }
     };
 
