@@ -34,6 +34,10 @@ export interface IceCandidateEvent {
 
 export interface CallEndedEvent {
   fromUserId: string;
+  // Absent on old cached clients only — always sent now. Lets the receiver
+  // ignore a stale/duplicate decline-or-end that doesn't match whatever
+  // call it's actually on (e.g. replayed after a SignalR auto-reconnect).
+  callId?: string;
 }
 
 // Sent to every connection I have (all my open tabs/devices) when I answer

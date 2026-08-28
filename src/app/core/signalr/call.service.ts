@@ -52,11 +52,20 @@ export class CallService {
     this.hub.on<IncomingCallEvent>('IncomingCall', (e) => this.handleIncomingCall(e));
     this.hub.on<CallAnsweredEvent>('CallAnswered', (e) => void this.handleCallAnswered(e));
     this.hub.on<IceCandidateEvent>('IceCandidateReceived', (e) => void this.handleRemoteIceCandidate(e));
-    this.hub.on<CallEndedEvent>('CallDeclined', () => {
+    // Guarded against stale/duplicate delivery (e.g. replayed after a
+    // SignalR auto-reconnect on a flaky connection) — without this, a late
+    // CallDeclined/CallEnded for a call I've already moved on from (already
+    // connected on a fresher attempt, or already reset) would spuriously
+    // tear down whatever I'm actually doing now.
+    this.hub.on<CallEndedEvent>('CallDeclined', (e) => {
+      if (e.callId && e.callId !== this.callId()) return;
       this.errorMessage.set('Call declined.');
       this.resetCall();
     });
-    this.hub.on<CallEndedEvent>('CallEnded', () => this.resetCall());
+    this.hub.on<CallEndedEvent>('CallEnded', (e) => {
+      if (e.callId && e.callId !== this.callId()) return;
+      this.resetCall();
+    });
     // Another of my own tabs/devices answered or declined this same invite —
     // stop ringing here too, without notifying the caller a second time.
     this.hub.on<IncomingCallResolvedEvent>('IncomingCallResolved', (e) => {
