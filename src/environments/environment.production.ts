@@ -33,5 +33,18 @@ export const environment = {
     // Open Source / VoIP Community
     { urls: 'stun:stun.sipgate.net:10000' },
     { urls: 'stun:stun.miwifi.com:3478' },
+
+    // EXPERIMENT: Open Relay Project (metered.ca) free public TURN — added to
+    // test whether calls between peers behind symmetric NAT/CGNAT need a
+    // relay to connect at all. Credentials are intentionally public test
+    // creds published by the provider, not a leaked secret. Remove or swap
+    // for real TURN credentials once the experiment confirms this is the fix.
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
   ] as RTCIceServer[],
 };
