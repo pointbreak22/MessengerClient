@@ -14,6 +14,14 @@ export function createDiagnosticPeerConnection(iceServers: RTCIceServer[], logPr
   pc.oniceconnectionstatechange = () => {
     console.debug(`[${logPrefix}] iceConnectionState ->`, pc.iceConnectionState);
   };
+  // connectionState too, not just iceConnectionState: only the former
+  // distinguishes "still negotiating" from "the browser has given up"
+  // ('failed'), which is exactly what you need when one peer of a mesh call
+  // won't come up. Lives here rather than in the services so group calls get
+  // it as well — CallService used to log this itself for 1:1 only.
+  pc.addEventListener('connectionstatechange', () => {
+    console.debug(`[${logPrefix}] connectionState ->`, pc.connectionState);
+  });
 
   // The error handler above only ever reports FAILURES, which makes a noisy
   // console badly misleading: a dozen dead STUN/TURN hosts get logged while
