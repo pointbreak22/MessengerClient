@@ -5,7 +5,7 @@ import { AuthService } from '../auth/auth.service';
 import { UserApiService } from '../../services/user-api.service';
 import { IceCandidateQueue } from '../calling/ice-candidate-queue';
 import { getLocalMediaStream, setMediaTrackEnabled } from '../calling/media-devices';
-import { createDiagnosticPeerConnection } from '../calling/peer-connection';
+import { createDiagnosticPeerConnection, watchPeerConnectionFailure } from '../calling/peer-connection';
 import { Ringer } from '../calling/ringer';
 import { SettingsStore } from '../../stores/settings.store';
 import { GroupCallProvider, GroupCallState, ParticipantState } from '../calling/group-call-provider';
@@ -226,10 +226,12 @@ export class GroupCallService implements GroupCallProvider {
   private async handleRoster(e: GroupCallRosterEvent): Promise<void> {
     if (e.callId !== this._callId()) return;
     const myId = this.auth.currentUserProfile()?.id;
-    for (const userId of e.participantIds) {
-      if (userId === myId) continue;
-      await this.connectToPeer(userId);
-    }
+    // One participant per Promise, not a sequential for-await — a single
+    // connectToPeer() rejection (offer creation/signaling hiccup for that one
+    // peer) must not stop the rest of the roster from ever being offered to.
+    await Promise.allSettled(
+      e.participantIds.filter((userId) => userId !== myId).map((userId) => this.connectToPeer(userId)),
+    );
   }
 
   private handleParticipantJoined(e: ParticipantJoinedEvent): void {
@@ -255,20 +257,30 @@ export class GroupCallService implements GroupCallProvider {
     const pc = this.createPeerConnection(e.fromUserId);
     this.attachLocalTracks(pc);
 
-    await pc.setRemoteDescription({ type: 'offer', sdp: e.sdp });
-    await this.flushPendingIce(e.fromUserId, pc);
+    try {
+      await pc.setRemoteDescription({ type: 'offer', sdp: e.sdp });
+      await this.flushPendingIce(e.fromUserId, pc);
 
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    await this.hub.invoke('SendGroupAnswer', e.callId, e.fromUserId, answer.sdp);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await this.hub.invoke('SendGroupAnswer', e.callId, e.fromUserId, answer.sdp);
+    } catch {
+      // Only this one peer failed to negotiate — drop just them, the rest
+      // of the mesh is unaffected.
+      this.removeParticipant(e.fromUserId);
+    }
   }
 
   private async handleGroupAnswer(e: GroupAnswerReceivedEvent): Promise<void> {
     if (e.callId !== this._callId()) return;
     const pc = this.peers.get(e.fromUserId);
     if (!pc) return;
-    await pc.setRemoteDescription({ type: 'answer', sdp: e.sdp });
-    await this.flushPendingIce(e.fromUserId, pc);
+    try {
+      await pc.setRemoteDescription({ type: 'answer', sdp: e.sdp });
+      await this.flushPendingIce(e.fromUserId, pc);
+    } catch {
+      this.removeParticipant(e.fromUserId);
+    }
   }
 
   private async handleGroupIceCandidate(e: GroupIceCandidateReceivedEvent): Promise<void> {
@@ -305,12 +317,19 @@ export class GroupCallService implements GroupCallProvider {
     const pc = this.createPeerConnection(remoteUserId);
     this.attachLocalTracks(pc);
 
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
 
-    const callId = this._callId();
-    if (!callId) return;
-    await this.hub.invoke('SendGroupOffer', callId, remoteUserId, offer.sdp);
+      const callId = this._callId();
+      if (!callId) return;
+      await this.hub.invoke('SendGroupOffer', callId, remoteUserId, offer.sdp);
+    } catch {
+      // Leave a half-set-up peer connection lying around and this user never
+      // gets removed/retried — clean up so a stale entry doesn't linger in
+      // this.peers for candidates to trickle into later.
+      this.removeParticipant(remoteUserId);
+    }
   }
 
   private attachLocalTracks(pc: RTCPeerConnection): void {
@@ -343,11 +362,15 @@ export class GroupCallService implements GroupCallProvider {
       this.attachSpeakingAnalyser(remoteUserId, stream);
     };
 
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        this.removeParticipant(remoteUserId);
-      }
-    };
+    // Same "browser may never say failed" problem as CallService — a peer
+    // that never actually establishes (or drops and never recovers) must
+    // still get pulled from the grid instead of sitting there forever as a
+    // silent/frozen tile. Guarded on this.peers.get(remoteUserId) === pc so
+    // a stale watchdog from an already-replaced connection can't fire late.
+    watchPeerConnectionFailure(pc, () => {
+      if (this.peers.get(remoteUserId) !== pc) return;
+      this.removeParticipant(remoteUserId);
+    });
 
     this.peers.set(remoteUserId, pc);
     return pc;

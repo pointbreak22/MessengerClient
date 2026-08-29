@@ -17,3 +17,51 @@ export function createDiagnosticPeerConnection(iceServers: RTCIceServer[], logPr
 
   return pc;
 }
+
+// Native connectionState is not a reliable failure signal on its own: a
+// doomed connection (NAT traversal never succeeds, no usable candidate pair)
+// can sit in 'new'/'connecting'/'checking' forever without the browser ever
+// declaring 'failed' — that's what left a callee's screen stuck on
+// "Connected" with no media indefinitely after a call that never actually
+// connected. This watchdog imposes a deadline the browser doesn't: give up
+// if 'connected' isn't reached within CONNECT_TIMEOUT_MS, or if a live
+// connection drops to 'disconnected' and doesn't recover within
+// DISCONNECT_GRACE_MS. Native 'failed'/'closed' still fire onFailed
+// immediately, same as before.
+const CONNECT_TIMEOUT_MS = 20_000;
+const DISCONNECT_GRACE_MS = 10_000;
+
+export function watchPeerConnectionFailure(pc: RTCPeerConnection, onFailed: () => void): () => void {
+  let settled = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const fail = () => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    onFailed();
+  };
+
+  const onChange = () => {
+    if (settled) return;
+    const state = pc.connectionState;
+    if (state === 'connected') {
+      clearTimeout(timer);
+      timer = undefined;
+    } else if (state === 'failed' || state === 'closed') {
+      fail();
+    } else if (state === 'disconnected') {
+      clearTimeout(timer);
+      timer = setTimeout(fail, DISCONNECT_GRACE_MS);
+    }
+  };
+
+  pc.addEventListener('connectionstatechange', onChange);
+  timer = setTimeout(fail, CONNECT_TIMEOUT_MS);
+
+  return () => {
+    settled = true;
+    clearTimeout(timer);
+    pc.removeEventListener('connectionstatechange', onChange);
+  };
+}

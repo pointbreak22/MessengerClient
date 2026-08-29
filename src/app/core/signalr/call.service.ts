@@ -5,7 +5,7 @@ import { UserApiService } from '../../services/user-api.service';
 import { UserProfile } from '../../interfaces/user-profile';
 import { IceCandidateQueue } from '../calling/ice-candidate-queue';
 import { getLocalMediaStream, setMediaTrackEnabled } from '../calling/media-devices';
-import { createDiagnosticPeerConnection } from '../calling/peer-connection';
+import { createDiagnosticPeerConnection, watchPeerConnectionFailure } from '../calling/peer-connection';
 import { Ringer } from '../calling/ringer';
 import { SettingsStore } from '../../stores/settings.store';
 import {
@@ -248,10 +248,15 @@ export class CallService {
 
   private async handleCallAnswered(e: CallAnsweredEvent): Promise<void> {
     if (!this.peerConnection || this.state() !== 'outgoing') return;
-    await this.peerConnection.setRemoteDescription({ type: 'answer', sdp: e.answerSdp });
-    await this.pendingIceCandidates.flush(this.peerConnection);
-    this.ringer.stop();
-    this.state.set('connected');
+    try {
+      await this.peerConnection.setRemoteDescription({ type: 'answer', sdp: e.answerSdp });
+      await this.pendingIceCandidates.flush(this.peerConnection);
+      this.ringer.stop();
+      this.state.set('connected');
+    } catch {
+      this.errorMessage.set('Could not establish the call.');
+      this.endCallLocally();
+    }
   }
 
   private async handleRemoteIceCandidate(e: IceCandidateEvent): Promise<void> {
@@ -295,17 +300,20 @@ export class CallService {
 
     pc.onconnectionstatechange = () => {
       console.debug('[call] connectionState ->', pc.connectionState);
-      // Both branches must tell the other party (endCallLocally, not a bare
-      // resetCall()) — otherwise only the side that noticed the failure
-      // resets, and the other one is left stuck showing a "connected"/
-      // "calling..." screen for a call that's actually dead on both ends.
-      if (pc.connectionState === 'failed') {
-        this.errorMessage.set('Call connection lost.');
-        this.endCallLocally();
-      } else if (pc.connectionState === 'closed') {
-        this.endCallLocally();
-      }
     };
+
+    // Both the native 'failed'/'closed' case and the "never actually
+    // connects, browser never says so" case must tell the other party
+    // (endCallLocally, not a bare resetCall()) — otherwise only the side
+    // that noticed the failure resets, and the other one is left stuck
+    // showing a "connected"/"calling..." screen for a call that's actually
+    // dead on both ends. Guarded on this.peerConnection === pc so a stale
+    // watchdog from an already-replaced/reset connection can't fire late.
+    watchPeerConnectionFailure(pc, () => {
+      if (this.peerConnection !== pc) return;
+      this.errorMessage.set('Call connection lost.');
+      this.endCallLocally();
+    });
 
     this.peerConnection = pc;
     return pc;

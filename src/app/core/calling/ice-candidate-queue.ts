@@ -18,8 +18,11 @@ export class IceCandidateQueue {
   async flush(pc: RTCPeerConnection): Promise<void> {
     const pending = this.queue;
     this.queue = [];
-    for (const candidate of pending) {
-      await pc.addIceCandidate(candidate);
-    }
+    // One rejected addIceCandidate() (a stale/duplicate candidate, most
+    // commonly) must not stop the rest of the batch from being added — a
+    // sequential for-await here would silently drop every candidate queued
+    // after the first failure, shrinking the candidate pool ICE has to find
+    // a working pair from.
+    await Promise.allSettled(pending.map((candidate) => pc.addIceCandidate(candidate)));
   }
 }

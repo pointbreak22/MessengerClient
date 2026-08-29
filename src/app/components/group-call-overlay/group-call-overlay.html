@@ -253,7 +253,7 @@
     [class.ring-2]="tile.speaking"
     [class.ring-online]="tile.speaking"
   >
-    @if (call.isVideo() && !tile.cameraOff && tile.stream) {
+    @if (hasVideo(tile)) {
       <video
         [srcObject]="tile.stream"
         autoplay
@@ -279,7 +279,7 @@
       @if (tile.micMuted) {
         <svg appIcon="mic-off" class="h-3 w-3 shrink-0 text-white"></svg>
       }
-      @if (call.isVideo() && tile.cameraOff) {
+      @if (tile.cameraOff) {
         <svg appIcon="video-off" class="h-3 w-3 shrink-0 text-white"></svg>
       }
     </div>

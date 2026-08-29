@@ -78,6 +78,16 @@ export class GroupCallOverlay {
     return tile.userId === this.myUserId();
   }
 
+  // Whether to actually render this tile's video element — per-tile, based on
+  // whether its own stream carries a live video track. Deliberately NOT
+  // gated on call.isVideo(): that signal reflects MY OWN camera state (it
+  // flips to false if my camera fails and I fall back to audio-only), and
+  // gating every tile on it would hide everyone else's video just because my
+  // own camera didn't come up.
+  hasVideo(tile: ParticipantState): boolean {
+    return !tile.cameraOff && (tile.stream?.getVideoTracks().length ?? 0) > 0;
+  }
+
   displayName(tile: ParticipantState): string {
     if (this.isSelf(tile)) return `${tile.profile?.userName ?? 'You'} (you)`;
     return tile.profile?.userName ?? '...';
