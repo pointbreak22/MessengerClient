@@ -355,8 +355,9 @@ export class CallService {
       this.remoteTrackVersion.update((v) => v + 1);
     };
 
-    // (connectionState logging lives in createDiagnosticPeerConnection now,
-    // so 1:1 and group calls report it identically.)
+    pc.onconnectionstatechange = () => {
+      console.debug('[call] connectionState ->', pc.connectionState);
+    };
 
     // Both the native 'failed'/'closed' case and the "never actually
     // connects, browser never says so" case must tell the other party

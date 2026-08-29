@@ -14,59 +14,6 @@ export function createDiagnosticPeerConnection(iceServers: RTCIceServer[], logPr
   pc.oniceconnectionstatechange = () => {
     console.debug(`[${logPrefix}] iceConnectionState ->`, pc.iceConnectionState);
   };
-  // connectionState too, not just iceConnectionState: only the former
-  // distinguishes "still negotiating" from "the browser has given up"
-  // ('failed'), which is exactly what you need when one peer of a mesh call
-  // won't come up. Lives here rather than in the services so group calls get
-  // it as well — CallService used to log this itself for 1:1 only.
-  pc.addEventListener('connectionstatechange', () => {
-    console.debug(`[${logPrefix}] connectionState ->`, pc.connectionState);
-  });
-
-  // The error handler above only ever reports FAILURES, which makes a noisy
-  // console badly misleading: a dozen dead STUN/TURN hosts get logged while
-  // the one server that did work stays invisible, and ICE only needs one.
-  // These two listeners log the other half — what was actually gathered, and
-  // which candidate pair ultimately carried the call.
-  //
-  // addEventListener (not the on* property) on purpose: callers assign their
-  // own pc.onicecandidate/pc.onconnectionstatechange, and a property
-  // assignment would silently replace whatever we set here.
-  pc.addEventListener('icecandidate', (event) => {
-    const candidate = event.candidate;
-    if (!candidate?.candidate) return;
-    // type: host = local interface (no server needed), srflx = public address
-    // via STUN, relay = through a TURN server, prflx = peer-reflexive.
-    console.debug(
-      `[${logPrefix}] local candidate`,
-      candidate.type,
-      candidate.protocol,
-      candidate.address ?? '',
-    );
-  });
-
-  pc.addEventListener('connectionstatechange', () => {
-    if (pc.connectionState !== 'connected') return;
-    void pc
-      .getStats()
-      .then((stats) => {
-        const pair = [...stats.values()].find(
-          (s) => s.type === 'candidate-pair' && (s as RTCIceCandidatePairStats).state === 'succeeded',
-        ) as RTCIceCandidatePairStats | undefined;
-        if (!pair) return;
-        const local = stats.get(pair.localCandidateId);
-        const remote = stats.get(pair.remoteCandidateId);
-        console.info(
-          `[${logPrefix}] connected via`,
-          `${local?.candidateType ?? '?'} (${local?.protocol ?? '?'})`,
-          '->',
-          `${remote?.candidateType ?? '?'} (${remote?.protocol ?? '?'})`,
-        );
-      })
-      .catch(() => {
-        /* diagnostics only */
-      });
-  });
 
   return pc;
 }
