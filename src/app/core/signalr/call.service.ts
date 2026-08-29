@@ -269,7 +269,14 @@ export class CallService {
       this.pendingIceCandidates.add(candidate);
       return;
     }
-    await this.peerConnection.addIceCandidate(candidate);
+    // A stale/duplicate/otherwise-rejected candidate here is expected under
+    // packet loss or a flaky signaling path — not worth surfacing as an
+    // uncaught error, and definitely not worth doing anything else about.
+    try {
+      await this.peerConnection.addIceCandidate(candidate);
+    } catch {
+      /* best-effort */
+    }
   }
 
   private createPeerConnection(remoteUserId: string): RTCPeerConnection {

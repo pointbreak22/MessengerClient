@@ -295,7 +295,13 @@ export class GroupCallService implements GroupCallProvider {
       this.queueFor(e.fromUserId).add(candidate);
       return;
     }
-    await pc.addIceCandidate(candidate);
+    // Same reasoning as CallService: a rejected candidate here is expected
+    // under packet loss and shouldn't surface as an uncaught error.
+    try {
+      await pc.addIceCandidate(candidate);
+    } catch {
+      /* best-effort */
+    }
   }
 
   private async flushPendingIce(userId: string, pc: RTCPeerConnection): Promise<void> {
