@@ -5,7 +5,11 @@ import { AuthService } from '../auth/auth.service';
 import { UserApiService } from '../../services/user-api.service';
 import { IceCandidateQueue } from '../calling/ice-candidate-queue';
 import { getLocalMediaStream, setMediaTrackEnabled } from '../calling/media-devices';
-import { createDiagnosticPeerConnection, watchPeerConnectionFailure } from '../calling/peer-connection';
+import {
+  PeerConnectionWatchdog,
+  createDiagnosticPeerConnection,
+  watchPeerConnectionFailure,
+} from '../calling/peer-connection';
 import { Ringer } from '../calling/ringer';
 import { SettingsStore } from '../../stores/settings.store';
 import { GroupCallProvider, GroupCallState, ParticipantState } from '../calling/group-call-provider';
@@ -43,6 +47,7 @@ export class GroupCallService implements GroupCallProvider {
 
   private localStreamRaw: MediaStream | null = null;
   private readonly peers = new Map<string, RTCPeerConnection>();
+  private readonly watchdogs = new Map<string, PeerConnectionWatchdog>();
   private readonly pendingIce = new Map<string, IceCandidateQueue>();
   private readonly speakingAnalysers = new Map<string, { ctx: AudioContext; interval: ReturnType<typeof setInterval> }>();
   private pendingInvite: IncomingGroupCallEvent | null = null;
@@ -223,8 +228,21 @@ export class GroupCallService implements GroupCallProvider {
       .catch(() => this._incomingFromProfile.set(null));
   }
 
+  // Every inbound call event is filtered through this rather than a bare
+  // `e.callId !== this._callId()`. The starter of a group call only learns
+  // its callId when StartGroupCall returns, so an event for that very call
+  // can arrive while _callId is still null — rejecting it there would
+  // silently drop a peer (no offer/answer, participant never shows up). The
+  // server only routes these to actual participants of the call, so treating
+  // "id not known yet" as a match is safe; once we do know it, a mismatch is
+  // still a genuinely stale event and gets rejected as before.
+  private isForCurrentCall(callId: string): boolean {
+    const mine = this._callId();
+    return !mine || callId === mine;
+  }
+
   private async handleRoster(e: GroupCallRosterEvent): Promise<void> {
-    if (e.callId !== this._callId()) return;
+    if (!this.isForCurrentCall(e.callId)) return;
     const myId = this.auth.currentUserProfile()?.id;
     // One participant per Promise, not a sequential for-await — a single
     // connectToPeer() rejection (offer creation/signaling hiccup for that one
@@ -235,24 +253,24 @@ export class GroupCallService implements GroupCallProvider {
   }
 
   private handleParticipantJoined(e: ParticipantJoinedEvent): void {
-    if (e.callId !== this._callId()) return;
+    if (!this.isForCurrentCall(e.callId)) return;
     // Give the grid an immediate placeholder tile (name resolved, no stream
     // yet) rather than waiting for the offer/answer exchange to finish.
     this.resolveProfile(e.userId);
   }
 
   private handleParticipantLeft(e: ParticipantLeftEvent): void {
-    if (e.callId !== this._callId()) return;
+    if (!this.isForCurrentCall(e.callId)) return;
     this.removeParticipant(e.userId);
   }
 
   private handleMediaState(e: ParticipantMediaStateChangedEvent): void {
-    if (e.callId !== this._callId()) return;
+    if (!this.isForCurrentCall(e.callId)) return;
     this.updateParticipant(e.userId, (p) => ({ ...p, micMuted: e.micMuted, cameraOff: e.cameraOff }));
   }
 
   private async handleGroupOffer(e: GroupOfferReceivedEvent): Promise<void> {
-    if (e.callId !== this._callId()) return;
+    if (!this.isForCurrentCall(e.callId)) return;
     this.resolveProfile(e.fromUserId);
     const pc = this.createPeerConnection(e.fromUserId);
     this.attachLocalTracks(pc);
@@ -272,7 +290,7 @@ export class GroupCallService implements GroupCallProvider {
   }
 
   private async handleGroupAnswer(e: GroupAnswerReceivedEvent): Promise<void> {
-    if (e.callId !== this._callId()) return;
+    if (!this.isForCurrentCall(e.callId)) return;
     const pc = this.peers.get(e.fromUserId);
     if (!pc) return;
     try {
@@ -284,7 +302,7 @@ export class GroupCallService implements GroupCallProvider {
   }
 
   private async handleGroupIceCandidate(e: GroupIceCandidateReceivedEvent): Promise<void> {
-    if (e.callId !== this._callId()) return;
+    if (!this.isForCurrentCall(e.callId)) return;
     const candidate: RTCIceCandidateInit = {
       candidate: e.candidate,
       sdpMid: e.sdpMid ?? undefined,
@@ -373,10 +391,16 @@ export class GroupCallService implements GroupCallProvider {
     // still get pulled from the grid instead of sitting there forever as a
     // silent/frozen tile. Guarded on this.peers.get(remoteUserId) === pc so
     // a stale watchdog from an already-replaced connection can't fire late.
-    watchPeerConnectionFailure(pc, () => {
+    // Armed immediately, unlike the 1:1 case: a mesh peer is only ever dialed
+    // once they're already in the call room, so there's no ringing window
+    // where a slow-but-healthy connection would be killed prematurely.
+    this.watchdogs.get(remoteUserId)?.cancel();
+    const watchdog = watchPeerConnectionFailure(pc, () => {
       if (this.peers.get(remoteUserId) !== pc) return;
       this.removeParticipant(remoteUserId);
     });
+    watchdog.arm();
+    this.watchdogs.set(remoteUserId, watchdog);
 
     this.peers.set(remoteUserId, pc);
     return pc;
@@ -400,6 +424,11 @@ export class GroupCallService implements GroupCallProvider {
   }
 
   private removeParticipant(userId: string): void {
+    // Cancel before close(), same reasoning as CallService.resetCall(): the
+    // 'closed' state change would otherwise re-enter this method through the
+    // watchdog while we're already tearing this peer down.
+    this.watchdogs.get(userId)?.cancel();
+    this.watchdogs.delete(userId);
     this.peers.get(userId)?.close();
     this.peers.delete(userId);
     this.pendingIce.delete(userId);
@@ -454,6 +483,8 @@ export class GroupCallService implements GroupCallProvider {
 
   private reset(): void {
     this.ringer.stop();
+    for (const watchdog of this.watchdogs.values()) watchdog.cancel();
+    this.watchdogs.clear();
     for (const pc of this.peers.values()) pc.close();
     this.peers.clear();
     this.pendingIce.clear();

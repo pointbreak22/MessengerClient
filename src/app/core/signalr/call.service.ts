@@ -1,11 +1,15 @@
-import { Injectable, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { UserApiService } from '../../services/user-api.service';
 import { UserProfile } from '../../interfaces/user-profile';
 import { IceCandidateQueue } from '../calling/ice-candidate-queue';
 import { getLocalMediaStream, setMediaTrackEnabled } from '../calling/media-devices';
-import { createDiagnosticPeerConnection, watchPeerConnectionFailure } from '../calling/peer-connection';
+import {
+  PeerConnectionWatchdog,
+  createDiagnosticPeerConnection,
+  watchPeerConnectionFailure,
+} from '../calling/peer-connection';
 import { Ringer } from '../calling/ringer';
 import { SettingsStore } from '../../stores/settings.store';
 import {
@@ -28,8 +32,13 @@ export class CallService {
   private readonly settings = inject(SettingsStore);
 
   private peerConnection: RTCPeerConnection | null = null;
+  private watchdog: PeerConnectionWatchdog | null = null;
   private localStream: MediaStream | null = null;
   private pendingOffer: { fromUserId: string; chatId: string; sdp: string } | null = null;
+  // Set while THIS device is in the middle of answering — see the
+  // IncomingCallResolved handler for why that has to be distinguishable
+  // from another of my devices having answered.
+  private answeringCallId: string | null = null;
   private readonly pendingIceCandidates = new IceCandidateQueue();
   private readonly ringer = new Ringer();
 
@@ -47,6 +56,23 @@ export class CallService {
   readonly cameraOff = signal(false);
   readonly errorMessage = signal<string | null>(null);
 
+  // ontrack fires once per track (audio, then video) but hands back the SAME
+  // MediaStream instance every time, so re-setting remoteMediaStream doesn't
+  // notify — signals compare by reference. Without this version counter the
+  // UI would keep rendering whatever it decided when the first (audio) track
+  // landed and never notice the video track arriving a moment later.
+  private readonly remoteTrackVersion = signal(0);
+
+  // Whether there's actually video to show, per side. Deliberately NOT
+  // derived from isVideo(): that's "did *I* manage to open my camera", which
+  // flips to false on a camera fallback and would then hide the other
+  // person's video too.
+  readonly remoteHasVideo = computed(() => {
+    this.remoteTrackVersion();
+    return (this.remoteMediaStream()?.getVideoTracks().length ?? 0) > 0;
+  });
+  readonly localHasVideo = computed(() => (this.localMediaStream()?.getVideoTracks().length ?? 0) > 0);
+
   constructor() {
     this.hub.on<IncomingCallEvent>('IncomingCall', (e) => this.handleIncomingCall(e));
     this.hub.on<CallAnsweredEvent>('CallAnswered', (e) => void this.handleCallAnswered(e));
@@ -56,18 +82,29 @@ export class CallService {
     // CallDeclined/CallEnded for a call I've already moved on from (already
     // connected on a fresher attempt, or already reset) would spuriously
     // tear down whatever I'm actually doing now.
+    // Both guards require a KNOWN local callId to reject on mismatch: an
+    // outgoing call only learns its own callId when CallUser returns, and a
+    // fast decline can land before that. Dropping it then would leave the
+    // caller ringing forever (nothing else tears an unanswered call down —
+    // the watchdog deliberately isn't armed while ringing).
     this.hub.on<CallEndedEvent>('CallDeclined', (e) => {
-      if (e.callId && e.callId !== this.callId()) return;
+      if (e.callId && this.callId() && e.callId !== this.callId()) return;
       this.errorMessage.set('Call declined.');
       this.resetCall();
     });
     this.hub.on<CallEndedEvent>('CallEnded', (e) => {
-      if (e.callId && e.callId !== this.callId()) return;
+      if (e.callId && this.callId() && e.callId !== this.callId()) return;
       this.resetCall();
     });
     // Another of my own tabs/devices answered or declined this same invite —
     // stop ringing here too, without notifying the caller a second time.
+    // The server fans this out to ALL of my connections including the one
+    // that just answered, and it can land while acceptCall() is still
+    // awaiting its AnswerCall invocation (state therefore still 'incoming').
+    // Without the answeringCallId check that would reset the very call this
+    // device just picked up.
     this.hub.on<IncomingCallResolvedEvent>('IncomingCallResolved', (e) => {
+      if (this.answeringCallId === e.callId) return;
       if (this.state() === 'incoming' && this.callId() === e.callId) this.resetCall();
     });
 
@@ -119,6 +156,7 @@ export class CallService {
   async acceptCall(): Promise<void> {
     if (this.state() !== 'incoming' || !this.pendingOffer) return;
     const { fromUserId, sdp } = this.pendingOffer;
+    this.answeringCallId = this.callId();
 
     try {
       const { stream, videoFallback } = await getLocalMediaStream(this.isVideo(), this.settings);
@@ -142,6 +180,9 @@ export class CallService {
       await this.hub.invoke('AnswerCall', fromUserId, this.callId(), answer.sdp);
       this.ringer.stop();
       this.state.set('connected');
+      // Negotiation is done on this side — from here on, failing to reach a
+      // live connection is a real failure rather than "still ringing".
+      this.watchdog?.arm();
     } catch {
       this.errorMessage.set('Could not answer the call — check camera/microphone permissions.');
       this.declineCall();
@@ -214,7 +255,12 @@ export class CallService {
         kind === 'video' ? { video: constraint } : { audio: constraint },
       );
       const [newTrack] = kind === 'video' ? stream.getVideoTracks() : stream.getAudioTracks();
-      if (!newTrack) return;
+      if (!newTrack) {
+        // Nothing usable came back — release the device again instead of
+        // leaving the freshly-opened camera/mic held by an orphaned stream.
+        for (const t of stream.getTracks()) t.stop();
+        return;
+      }
 
       const sender = this.peerConnection.getSenders().find((s) => s.track?.kind === kind);
       await sender?.replaceTrack(newTrack);
@@ -253,6 +299,9 @@ export class CallService {
       await this.pendingIceCandidates.flush(this.peerConnection);
       this.ringer.stop();
       this.state.set('connected');
+      // They picked up — the call is no longer "ringing", so start holding
+      // the connection to the connect deadline.
+      this.watchdog?.arm();
     } catch {
       this.errorMessage.set('Could not establish the call.');
       this.endCallLocally();
@@ -303,6 +352,7 @@ export class CallService {
         event.streams[0]?.getTracks().map((t) => t.kind),
       );
       this.remoteMediaStream.set(event.streams[0] ?? null);
+      this.remoteTrackVersion.update((v) => v + 1);
     };
 
     pc.onconnectionstatechange = () => {
@@ -316,7 +366,10 @@ export class CallService {
     // showing a "connected"/"calling..." screen for a call that's actually
     // dead on both ends. Guarded on this.peerConnection === pc so a stale
     // watchdog from an already-replaced/reset connection can't fire late.
-    watchPeerConnectionFailure(pc, () => {
+    // Only armed once the call is actually answered (see arm() call sites) —
+    // an outgoing call may legitimately ring far longer than the connect
+    // timeout before anyone picks up.
+    this.watchdog = watchPeerConnectionFailure(pc, () => {
       if (this.peerConnection !== pc) return;
       this.errorMessage.set('Call connection lost.');
       this.endCallLocally();
@@ -328,11 +381,17 @@ export class CallService {
 
   private resetCall(): void {
     this.ringer.stop();
+    // Cancel before close(): closing fires a 'closed' connectionstatechange
+    // the watchdog would otherwise treat as a failure and bounce back into
+    // endCallLocally() from inside the teardown we're already doing.
+    this.watchdog?.cancel();
+    this.watchdog = null;
     this.peerConnection?.close();
     this.peerConnection = null;
     for (const track of this.localStream?.getTracks() ?? []) track.stop();
     this.localStream = null;
     this.pendingOffer = null;
+    this.answeringCallId = null;
     this.pendingIceCandidates.clear();
     this.localMediaStream.set(null);
     this.remoteMediaStream.set(null);

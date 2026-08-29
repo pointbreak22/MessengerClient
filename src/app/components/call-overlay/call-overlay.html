@@ -83,21 +83,43 @@
           </div>
         }
 
-        @if (call.isVideo()) {
+        <!-- Each side is decided by the tracks that actually exist, not by
+             isVideo(): my camera failing shouldn't hide their video, and
+             their camera being off shouldn't hide my own preview. -->
+        @if (call.remoteHasVideo() || call.localHasVideo()) {
           <div class="relative min-h-0 flex-1 bg-black">
-            <video
-              [srcObject]="call.remoteMediaStream()"
-              autoplay
-              playsinline
-              class="h-full w-full object-contain"
-            ></video>
-            <video
-              [srcObject]="call.localMediaStream()"
-              autoplay
-              playsinline
-              muted
-              class="absolute bottom-4 right-4 h-28 w-20 rounded-lg border border-border-strong object-cover shadow-lg sm:h-36 sm:w-24"
-            ></video>
+            @if (call.remoteHasVideo()) {
+              <video
+                [srcObject]="call.remoteMediaStream()"
+                autoplay
+                playsinline
+                class="h-full w-full object-contain"
+              ></video>
+            } @else {
+              <!-- Audio-only on their end — still play their audio, and show
+                   who it is instead of a black rectangle. -->
+              <audio [srcObject]="call.remoteMediaStream()" autoplay></audio>
+              <div class="flex h-full w-full flex-col items-center justify-center gap-3">
+                <app-avatar
+                  [name]="call.remoteProfile()?.userName"
+                  [avatarUrl]="call.remoteProfile()?.avatarUrl"
+                  sizeClass="h-24 w-24"
+                  textClass="text-2xl font-semibold"
+                  colorClass="bg-gradient-to-br from-accent-500/30 to-accent2-500/30 text-accent-400 ring-4 ring-accent-500/5"
+                />
+                <h3 class="text-sm font-semibold text-foreground">{{ call.remoteProfile()?.userName }}</h3>
+              </div>
+            }
+
+            @if (call.localHasVideo()) {
+              <video
+                [srcObject]="call.localMediaStream()"
+                autoplay
+                playsinline
+                muted
+                class="absolute bottom-4 right-4 h-28 w-20 rounded-lg border border-border-strong object-cover shadow-lg sm:h-36 sm:w-24"
+              ></video>
+            }
           </div>
         } @else {
           <audio [srcObject]="call.remoteMediaStream()" autoplay></audio>
