@@ -35,24 +35,44 @@ export const appConfig: ApplicationConfig = {
       const msal = inject(MsalService);
       const injector = inject(Injector);
 
-      // Must fully complete before anything (including AuthService's field
-      // initializer, which reads getActiveAccount()) touches msal.instance —
-      // calling that first threw BrowserAuthError: uninitialized_public_client_application.
-      await msal.instance.initialize();
+      // Everything MSAL-related is wrapped: an app initializer that rejects
+      // aborts bootstrap outright, and the user gets a permanently blank page
+      // with no UI to recover from. handleRedirectObservable() in particular
+      // throws on a half-finished redirect (state_mismatch,
+      // interaction_in_progress after a closed tab, a stale hash in the URL),
+      // which is exactly the "blank on first open, fine after F5" symptom —
+      // the reload clears the hash, so the second attempt succeeds. Failing
+      // soft instead leaves the app running and lands the visitor on the
+      // public landing page, from which they can simply sign in again.
+      try {
+        // Must fully complete before anything (including AuthService's field
+        // initializer, which reads getActiveAccount()) touches msal.instance —
+        // calling that first threw BrowserAuthError: uninitialized_public_client_application.
+        await msal.instance.initialize();
 
-      const result = await firstValueFrom(msal.handleRedirectObservable());
-      if (result?.account) {
-        msal.instance.setActiveAccount(result.account);
-      } else if (msal.instance.getAllAccounts().length > 0) {
-        msal.instance.setActiveAccount(msal.instance.getAllAccounts()[0]);
+        const result = await firstValueFrom(msal.handleRedirectObservable());
+        if (result?.account) {
+          msal.instance.setActiveAccount(result.account);
+        } else if (!msal.instance.getActiveAccount() && msal.instance.getAllAccounts().length > 0) {
+          msal.instance.setActiveAccount(msal.instance.getAllAccounts()[0]);
+        }
+      } catch (err) {
+        console.error('[auth] MSAL initialization failed, continuing unauthenticated', err);
       }
 
       // inject() needs an active injection context, which normally only exists
       // synchronously before the first `await` — runInInjectionContext
       // re-establishes it here so AuthService can still be constructed (and
       // only now, with msal.instance fully initialized and the account set).
+      //
+      // Deliberately NOT awaited. initializeSession() fetches GET /users/me,
+      // and this backend cold-starts: awaiting an HTTP round trip here holds
+      // the entire bootstrap — nothing renders until it answers, which is the
+      // other half of the "blank page on first visit, fine on reload" report
+      // (the second visit hits an already-warm backend). The profile arrives
+      // through a signal, so the UI fills in on its own once it lands.
       const auth = runInInjectionContext(injector, () => inject(AuthService));
-      await auth.initializeSession();
+      void auth.initializeSession();
     }),
   ],
 };

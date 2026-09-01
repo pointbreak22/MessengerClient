@@ -18,7 +18,12 @@ import { Landing } from './pages/landing/landing';
 // overlays, group calling, emoji picker — to render a page with a heading
 // and a button, which hurts both first-load speed and Core Web Vitals.
 export const routes: Routes = [
-  { path: '', component: Landing },
+  // guestGuard forwards anyone already signed in straight to /app, so the
+  // landing page is never even constructed for them. Doing this in a guard
+  // rather than in Landing's constructor matters: a router.navigate() fired
+  // from a constructor runs *during* the initial navigation the router is
+  // still resolving, which races it.
+  { path: '', component: Landing, canActivate: [guestGuard] },
   {
     path: 'app',
     canActivate: [MsalGuard],

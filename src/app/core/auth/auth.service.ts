@@ -18,6 +18,9 @@ export class AuthService {
   // that hits the same dead session — without this, N concurrent 401s would
   // each independently call login() and race each other into the redirect.
   private reauthTriggered = false;
+  // See login() — stops a second redirect being started while the first is
+  // still in flight.
+  private loginInProgress = false;
 
   readonly currentAccount = this._currentAccount.asReadonly();
   readonly currentUserProfile = this._currentUserProfile.asReadonly();
@@ -69,7 +72,19 @@ export class AuthService {
   }
 
   login(): void {
-    this.msal.loginRedirect({ scopes: [apiScope] }).subscribe();
+    // Guarded for the same reason reauthTriggered exists: two overlapping
+    // loginRedirect() calls stomp on each other's state/nonce in MSAL's cache
+    // and the browser comes back to ClientAuthError: state_mismatch — which
+    // surfaces as a blank page. Dashboard drives one of the call sites from
+    // an effect(), so a re-run must not fire a second redirect while the
+    // first is still navigating away.
+    if (this.loginInProgress) return;
+    this.loginInProgress = true;
+    this.msal.loginRedirect({ scopes: [apiScope] }).subscribe({
+      error: () => {
+        this.loginInProgress = false;
+      },
+    });
   }
 
   logout(): void {
@@ -147,6 +162,22 @@ export class AuthService {
     this.reauthTriggered = true;
     this._currentAccount.set(null);
     this._currentUserProfile.set(null);
+
+    // Clearing the Angular signals alone was not enough, and this was the
+    // "I have to press Log out before it will let me sign in again" bug.
+    // MSAL keeps the account in localStorage independently of these signals,
+    // and _currentAccount is re-seeded from getActiveAccount() on every
+    // startup — so after a session expired, a reload resurrected the dead
+    // account, isAuthenticated() went back to true, the app rendered as
+    // logged in, and every single request 401'd forever. Only an explicit
+    // logout wiped the cache and broke the loop. Dropping the account here
+    // makes the next load start genuinely signed out instead.
+    try {
+      this.msal.instance.setActiveAccount(null);
+      void this.msal.instance.clearCache().catch(() => {});
+    } catch {
+      /* best-effort: the signals above are already reset either way */
+    }
   }
 
   private async loadCurrentUserProfile(): Promise<void> {
