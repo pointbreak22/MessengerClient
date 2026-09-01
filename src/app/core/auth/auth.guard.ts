@@ -8,5 +8,8 @@ import { AuthService } from './auth.service';
 export const guestGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  return auth.isAuthenticated() ? router.createUrlTree(['/']) : true;
+  // '/app', not '/': the root is the public landing page now, and sending an
+  // authenticated user there would just bounce them again (Landing forwards
+  // signed-in visitors on to the app).
+  return auth.isAuthenticated() ? router.createUrlTree(['/app']) : true;
 };

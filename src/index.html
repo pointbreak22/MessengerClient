@@ -2,16 +2,84 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>PBMessenger</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- SEO. This is a single-page app whose every real screen sits behind a
+       Microsoft sign-in, so the only thing a search engine can index is the
+       public landing page at '/'. These tags are what actually shows up in
+       search results and in link previews, and unlike the Angular-rendered
+       page they are present in the raw HTML for crawlers that don't run JS. -->
+  <title>Messenger Pointbreak — private chats, group chats and calls</title>
+  <meta name="description"
+        content="Messenger Pointbreak is a browser messenger: private and group chats, file sharing, and voice and video calls. Nothing to install — sign in with a Microsoft account.">
+  <link rel="canonical" href="https://green-mud-0a6cd920f.7.azurestaticapps.net/">
+
+  <!-- Open Graph / Twitter: link previews in messengers and social networks.
+       Those preview bots do not execute JavaScript at all, so this markup is
+       the only thing they will ever see. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Messenger Pointbreak">
+  <meta property="og:url" content="https://green-mud-0a6cd920f.7.azurestaticapps.net/">
+  <meta property="og:title" content="Messenger Pointbreak — private chats, group chats and calls">
+  <meta property="og:description"
+        content="A browser messenger: private and group chats, file sharing, and voice and video calls. Nothing to install.">
+  <meta property="og:image" content="https://green-mud-0a6cd920f.7.azurestaticapps.net/logo.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Messenger Pointbreak">
+  <meta name="twitter:description"
+        content="A browser messenger: private and group chats, file sharing, and voice and video calls.">
+  <meta name="twitter:image" content="https://green-mud-0a6cd920f.7.azurestaticapps.net/logo.png">
+
   <meta name="theme-color" content="#0c0e13">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="apple-touch-icon" href="icons/icon-192x192.png">
   <link rel="manifest" href="manifest.webmanifest">
+
+  <!-- Structured data: lets Google show this as an application rather than a
+       generic page. -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Messenger Pointbreak",
+      "url": "https://green-mud-0a6cd920f.7.azurestaticapps.net/",
+      "applicationCategory": "CommunicationApplication",
+      "operatingSystem": "Any (web browser)",
+      "description": "A browser messenger: private and group chats, file sharing, and voice and video calls.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+  </script>
 </head>
 <body>
-  <app-root></app-root>
+  <!-- Markup inside <app-root> is replaced the moment Angular bootstraps, so
+       this is never seen by a normal visitor beyond a flash while the bundle
+       loads — it doubles as the loading screen. It exists for the crawlers
+       (and preview bots) that fetch the HTML without executing JavaScript:
+       without it they would find an empty <app-root> and nothing to index.
+       Styles are inline on purpose, so it renders even before the stylesheet
+       has arrived. -->
+  <app-root>
+    <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+                background:#08090d;color:#f2f3f5;text-align:center;padding:16px;
+                font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;">
+      <div style="max-width:420px;">
+        <img src="/logo-192.png" alt="Messenger Pointbreak" width="56" height="56"
+             style="width:56px;height:56px;border-radius:16px;object-fit:cover;">
+        <h1 style="margin:20px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.02em;">
+          Messenger Pointbreak
+        </h1>
+        <p style="margin:12px 0 0;font-size:14px;line-height:1.6;color:#9aa0ab;">
+          A browser messenger: private and group chats, file sharing, and voice
+          and video calls. Nothing to install — sign in with a Microsoft account
+          and start talking.
+        </p>
+        <p style="margin:24px 0 0;font-size:13px;">
+          <a href="/app" style="color:#0ea5e9;text-decoration:none;">Open messenger</a>
+        </p>
+      </div>
+    </div>
+  </app-root>
   <noscript>Please enable JavaScript to continue using this application.</noscript>
 </body>
 </html>

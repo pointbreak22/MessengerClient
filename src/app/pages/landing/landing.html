@@ -1,0 +1,102 @@
+<div
+  class="relative flex min-h-dvh
+         items-center justify-center
+         overflow-hidden bg-background
+         px-4 text-foreground"
+>
+
+  <!-- Background -->
+  <div class="pointer-events-none absolute inset-0 overflow-hidden">
+
+    <div
+      class="absolute left-1/2 top-[-300px]
+             h-[600px] w-[600px]
+             -translate-x-1/2
+             rounded-full
+             bg-accent-500/[0.08]
+             blur-[120px]"
+    ></div>
+
+    <div
+      class="absolute bottom-[-300px] right-[-150px]
+             h-[500px] w-[500px]
+             rounded-full
+             bg-accent2-500/[0.05]
+             blur-[120px]"
+    ></div>
+
+    <div
+      class="absolute inset-0
+             bg-[radial-gradient(circle_at_center,
+             rgba(255,255,255,0.025)_1px,
+             transparent_1px)]
+             [background-size:24px_24px]
+             opacity-30"
+    ></div>
+
+  </div>
+
+  <!-- Card -->
+  <main class="relative z-10 w-full max-w-[520px] text-center">
+
+    <img
+      src="/logo-192.png"
+      alt="Messenger Pointbreak"
+      width="56"
+      height="56"
+      class="mx-auto h-14 w-14 rounded-2xl object-cover shadow-xl shadow-accent-500/20"
+    />
+
+    <h1 class="mt-6 text-3xl font-semibold tracking-tight sm:text-4xl">
+      Messenger Pointbreak
+    </h1>
+
+    <p class="mx-auto mt-4 max-w-[440px] text-sm leading-relaxed text-muted-foreground sm:text-base">
+      A messenger for private chats, group conversations and voice and video
+      calls right in the browser. No installation — sign in with a Microsoft
+      account and start talking.
+    </p>
+
+    <button
+      type="button"
+      (click)="openMessenger()"
+      class="mt-8 inline-flex h-12 items-center
+             justify-center gap-2 rounded-xl
+             bg-accent-500 px-8
+             text-sm font-medium text-white
+             shadow-lg shadow-accent-500/20
+             transition
+             hover:bg-accent-400
+             active:scale-[0.99]"
+    >
+      Open messenger
+    </button>
+
+    <ul class="mt-10 grid gap-3 text-left sm:grid-cols-3">
+      <li class="rounded-xl border border-border bg-surface-elevated p-4">
+        <h2 class="text-xs font-semibold text-foreground">Private chats</h2>
+        <p class="mt-1 text-[11px] leading-relaxed text-faint-foreground">
+          One-to-one conversations with instant delivery and read receipts.
+        </p>
+      </li>
+      <li class="rounded-xl border border-border bg-surface-elevated p-4">
+        <h2 class="text-xs font-semibold text-foreground">Group chats</h2>
+        <p class="mt-1 text-[11px] leading-relaxed text-faint-foreground">
+          Create a group, invite people and share files and images.
+        </p>
+      </li>
+      <li class="rounded-xl border border-border bg-surface-elevated p-4">
+        <h2 class="text-xs font-semibold text-foreground">Calls</h2>
+        <p class="mt-1 text-[11px] leading-relaxed text-faint-foreground">
+          Voice and video, one-to-one or with the whole group.
+        </p>
+      </li>
+    </ul>
+
+    <p class="mt-10 text-[11px] text-faint-foreground">
+      © 2026 Messenger Pointbreak
+    </p>
+
+  </main>
+
+</div>

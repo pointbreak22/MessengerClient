@@ -1,0 +1,9 @@
+# Only the landing page at / is meant to be indexed. Everything under /app is
+# the messenger itself: it requires a Microsoft sign-in, so a crawler would
+# only ever reach a redirect there — no reason to spend crawl budget on it.
+User-agent: *
+Allow: /$
+Disallow: /app
+Disallow: /login
+
+Sitemap: https://green-mud-0a6cd920f.7.azurestaticapps.net/sitemap.xml

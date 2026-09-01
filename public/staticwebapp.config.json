@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json.schemastore.org/staticwebapp.config.json",
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": [
+      "/robots.txt",
+      "/sitemap.xml",
+      "/manifest.webmanifest",
+      "/favicon.ico",
+      "/ngsw-worker.js",
+      "/ngsw.json",
+      "/icons/*",
+      "/svg/*",
+      "/*.{js,css,map,png,jpg,jpeg,gif,svg,webp,ico,json,txt,xml,webmanifest,woff,woff2,ttf}"
+    ]
+  },
+  "mimeTypes": {
+    ".webmanifest": "application/manifest+json",
+    ".xml": "application/xml",
+    ".json": "application/json"
+  },
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff"
+  },
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/index.html",
+      "statusCode": 200
+    }
+  }
+}
