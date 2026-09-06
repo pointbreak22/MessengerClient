@@ -97,7 +97,26 @@ export class ChatHubService {
 
     connection.onreconnecting(() => this.connectionState.set(HubConnectionState.Reconnecting));
     connection.onreconnected(() => this.connectionState.set(HubConnectionState.Connected));
-    connection.onclose(() => this.connectionState.set(HubConnectionState.Disconnected));
+
+    connection.onclose(() => {
+      this.connectionState.set(HubConnectionState.Disconnected);
+
+      // withAutomaticReconnect() only retries on its default policy — roughly
+      // 0s, 2s, 10s, 30s — and then gives up for good; onclose firing is
+      // precisely the signal that it has. Nothing used to run afterwards, so
+      // any backend outage lasting longer than about half a minute left the
+      // hub permanently dead: no new messages, no incoming calls, no presence,
+      // and the only cure was reloading the page. Restart our own (unbounded)
+      // retry loop instead, so the app reconnects by itself whenever the
+      // server comes back.
+      if (this.stopped) return;
+      // A newer connection has already replaced this one — its own handlers
+      // own the reconnect, this one is just a corpse being cleaned up.
+      if (this.connection !== connection) return;
+
+      this.connection = null;
+      void this.connect();
+    });
 
     for (const { methodName, callback } of this.handlers) {
       connection.on(methodName, callback);
