@@ -61,22 +61,39 @@ export class ChatHubService {
   private async connectWithRetry(): Promise<void> {
     for (let attempt = 0; !this.stopped; attempt++) {
       const connection = this.buildConnection();
+
+      // Published BEFORE start(), not after. start() is a network round trip,
+      // and services registering handlers in their constructors run during it:
+      // Dashboard kicks off connect() and Angular then creates its template —
+      // Chat -> MessageStore ('NewMessage'), CallOverlay -> CallService
+      // ('IncomingCall', ...), GroupCallOverlay -> GroupCallService. With the
+      // field still null for that whole window, on() below had nothing to
+      // attach to, and buildConnection() had already copied the handler list,
+      // so those handlers ended up bound to nothing at all: no live messages,
+      // no incoming calls, and a reload did not help because the race repeats
+      // every time. HubConnection.on() is safe to call before/while starting.
+      this.connection = connection;
+
       try {
         await connection.start();
         // disconnect() may have been called while start() was in flight.
         if (this.stopped) {
+          this.connection = null;
           void connection.stop().catch(() => {});
           return;
         }
-        this.connection = connection;
         this.connectionState.set(HubConnectionState.Connected);
         return;
       } catch (err) {
-        // Critically, the failed connection is NOT stored. It used to be
-        // assigned before start(), so a failure left a dead object in place
-        // and the `if (this.connection) return` at the top of connect() made
-        // every later attempt a silent no-op — the hub stayed dead for the
-        // whole session while the UI happily pretended otherwise.
+        // Clear the field again, so a connection that never came up cannot be
+        // mistaken for a working one. This is what the original code got
+        // wrong in the other direction: it assigned before start() and left
+        // the dead object in place on failure, and the old
+        // `if (this.connection) return` guard at the top of connect() then
+        // made every later attempt a silent no-op. The guard now tests for an
+        // actually-Connected state, so publishing early is safe as long as
+        // failures clean up after themselves here.
+        if (this.connection === connection) this.connection = null;
         this.connectionState.set(HubConnectionState.Disconnected);
         const delay = ChatHubService.RETRY_DELAYS_MS[
           Math.min(attempt, ChatHubService.RETRY_DELAYS_MS.length - 1)
