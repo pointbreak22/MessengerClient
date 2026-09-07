@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { MsalGuard } from '@azure/msal-angular';
-import { guestGuard } from './core/auth/auth.guard';
+import { guestGuard, superAdminGuard } from './core/auth/auth.guard';
 import { Landing } from './pages/landing/landing';
 
 // '' is deliberately NOT the app itself any more. It used to be Dashboard
@@ -33,6 +33,13 @@ export const routes: Routes = [
     path: 'login',
     canActivate: [guestGuard],
     loadComponent: () => import('./pages/auth/login/login').then((m) => m.Login),
+  },
+  {
+    // MsalGuard first so an anonymous visitor is sent to sign in rather than
+    // silently bounced; superAdminGuard then checks the role.
+    path: 'admin',
+    canActivate: [MsalGuard, superAdminGuard],
+    loadComponent: () => import('./pages/admin/admin').then((m) => m.Admin),
   },
   { path: '**', redirectTo: '' },
 ];

@@ -1,4 +1,5 @@
 import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { MessageApiService } from '../../services/message-api.service';
@@ -19,6 +20,7 @@ import { getInitials } from '../../shared/user-display';
 })
 export class Header {
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   private readonly userApi = inject(UserApiService);
   private readonly messageApi = inject(MessageApiService);
   private readonly userStore = inject(UserStore);
@@ -30,6 +32,9 @@ export class Header {
   @ViewChild('avatarFileInput') private readonly avatarFileInput!: ElementRef<HTMLInputElement>;
 
   protected readonly currentUser = this.auth.currentUserProfile;
+  // Shows the admin entry point. Hiding it is UX only — /admin has its own guard
+  // and the API rejects non-admins regardless.
+  protected readonly isSuperAdmin = this.auth.isSuperAdmin;
   protected readonly getInitials = getInitials;
 
   protected readonly incomingRequests = this.userStore.incomingRequests;
@@ -179,6 +184,10 @@ export class Header {
 
   signOut(): void {
     this.auth.logout();
+  }
+
+  openAdmin(): void {
+    void this.router.navigate(['/admin']);
   }
 
   toggleProfileMenu(): void {

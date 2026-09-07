@@ -367,6 +367,18 @@
         }
       </div>
 
+      @if (isSuperAdmin()) {
+        <button
+          (click)="openAdmin()"
+          title="Admin"
+          class="flex h-9 w-9 items-center justify-center
+                 rounded-xl text-faint-foreground
+                 transition hover:bg-surface-hover hover:text-foreground"
+        >
+          <svg appIcon="settings" class="h-4 w-4"></svg>
+        </button>
+      }
+
       <button
         (click)="signOut()"
         title="Sign out"

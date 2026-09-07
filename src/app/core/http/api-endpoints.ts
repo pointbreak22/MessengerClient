@@ -1,4 +1,12 @@
 export const ApiEndpoints = {
+  // Superadmin only — every one of these 403s for anyone else (server-side
+  // policy, not just a hidden button).
+  admin: {
+    users: '/admin/users',
+    user: (id: string) => `/admin/users/${id}`,
+    chats: '/admin/chats',
+    chat: (chatId: string) => `/admin/chats/${chatId}`,
+  },
   users: {
     list: '/users',
     me: '/users/me',

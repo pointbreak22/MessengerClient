@@ -1,0 +1,197 @@
+<div class="min-h-dvh bg-background text-foreground">
+
+  <header class="sticky top-0 z-10 border-b border-border bg-surface/95 backdrop-blur">
+    <div class="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
+      <button
+        (click)="back()"
+        title="Back to messenger"
+        class="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+      >
+        <svg appIcon="chevron-left" class="h-4 w-4"></svg>
+      </button>
+
+      <h1 class="text-sm font-semibold tracking-tight">Admin</h1>
+
+      <div class="ml-auto flex items-center gap-1 rounded-lg border border-border p-0.5">
+        <button
+          (click)="switchTab('users')"
+          class="rounded-md px-3 py-1.5 text-xs font-medium transition"
+          [class]="tab() === 'users'
+            ? 'bg-accent-500 text-white'
+            : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'"
+        >
+          Users
+        </button>
+        <button
+          (click)="switchTab('chats')"
+          class="rounded-md px-3 py-1.5 text-xs font-medium transition"
+          [class]="tab() === 'chats'
+            ? 'bg-accent-500 text-white'
+            : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'"
+        >
+          Public chats
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-4 py-5">
+
+    @if (error(); as err) {
+      <div class="mb-4 flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3">
+        <p class="min-w-0 flex-1 text-xs text-danger">{{ err }}</p>
+        <button (click)="dismissError()" title="Dismiss" class="shrink-0 text-danger/70 transition hover:text-danger">
+          <svg appIcon="close" class="h-3.5 w-3.5"></svg>
+        </button>
+      </div>
+    }
+
+    @if (loading()) {
+      <p class="py-10 text-center text-xs text-faint-foreground">Loading…</p>
+    } @else if (tab() === 'users') {
+
+      <div class="overflow-hidden rounded-xl border border-border">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-surface-alt text-faint-foreground">
+            <tr>
+              <th class="px-4 py-2.5 font-medium">Name</th>
+              <th class="px-4 py-2.5 font-medium">Login</th>
+              <th class="px-4 py-2.5 font-medium">Role</th>
+              <th class="px-4 py-2.5 font-medium">Status</th>
+              <th class="px-4 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (user of users(); track user.id) {
+              <tr class="border-t border-border">
+                <td class="px-4 py-2.5">
+                  @if (editingId() === user.id) {
+                    <input
+                      [value]="draft()"
+                      (input)="onDraftInput($event)"
+                      (keydown.enter)="saveUser(user)"
+                      (keydown.escape)="cancelEdit()"
+                      autofocus
+                      class="w-full rounded-md border border-border-strong bg-surface px-2 py-1 text-xs
+                             text-foreground outline-none focus:border-accent-500"
+                    />
+                  } @else {
+                    <span class="text-foreground">{{ user.userName }}</span>
+                  }
+                </td>
+
+                <td class="px-4 py-2.5 text-muted-foreground">{{ user.email ?? '—' }}</td>
+
+                <td class="px-4 py-2.5">
+                  @if (user.role === UserRole.SuperAdmin) {
+                    <span class="rounded-md bg-accent-500/15 px-2 py-0.5 text-[10px] font-medium text-accent-400">
+                      superadmin
+                    </span>
+                  } @else {
+                    <span class="text-faint-foreground">user</span>
+                  }
+                </td>
+
+                <td class="px-4 py-2.5">
+                  @if (user.isOnline) {
+                    <span class="text-online">online</span>
+                  } @else {
+                    <span class="text-faint-foreground">{{ formatLastSeen(user.lastSeenAt) }}</span>
+                  }
+                </td>
+
+                <td class="px-4 py-2.5 text-right">
+                  @if (editingId() === user.id) {
+                    <button (click)="saveUser(user)" class="mr-2 text-accent-400 transition hover:text-accent-500">Save</button>
+                    <button (click)="cancelEdit()" class="text-faint-foreground transition hover:text-foreground">Cancel</button>
+                  } @else {
+                    <button
+                      (click)="startEdit(user.id, user.userName)"
+                      class="text-muted-foreground transition hover:text-foreground"
+                    >
+                      Rename
+                    </button>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5" class="px-4 py-10 text-center text-faint-foreground">No users yet</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+    } @else {
+
+      <div class="overflow-hidden rounded-xl border border-border">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-surface-alt text-faint-foreground">
+            <tr>
+              <th class="px-4 py-2.5 font-medium">Name</th>
+              <th class="px-4 py-2.5 font-medium">Members</th>
+              <th class="px-4 py-2.5 font-medium">Visibility</th>
+              <th class="px-4 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (chat of chats(); track chat.id) {
+              <tr class="border-t border-border">
+                <td class="px-4 py-2.5">
+                  @if (editingId() === chat.id) {
+                    <input
+                      [value]="draft()"
+                      (input)="onDraftInput($event)"
+                      (keydown.enter)="saveChat(chat)"
+                      (keydown.escape)="cancelEdit()"
+                      autofocus
+                      class="w-full rounded-md border border-border-strong bg-surface px-2 py-1 text-xs
+                             text-foreground outline-none focus:border-accent-500"
+                    />
+                  } @else {
+                    <span class="text-foreground">{{ chat.name ?? '—' }}</span>
+                  }
+                </td>
+
+                <td class="px-4 py-2.5 text-muted-foreground">{{ chat.memberCount }}</td>
+
+                <td class="px-4 py-2.5">
+                  <button
+                    (click)="togglePublic(chat)"
+                    [title]="chat.isPublic ? 'Make private' : 'Make public'"
+                    class="rounded-md px-2 py-0.5 text-[10px] font-medium transition"
+                    [class]="chat.isPublic
+                      ? 'bg-online/15 text-online hover:bg-online/25'
+                      : 'bg-surface-hover text-faint-foreground hover:text-foreground'"
+                  >
+                    {{ chat.isPublic ? 'public' : 'private' }}
+                  </button>
+                </td>
+
+                <td class="px-4 py-2.5 text-right">
+                  @if (editingId() === chat.id) {
+                    <button (click)="saveChat(chat)" class="mr-2 text-accent-400 transition hover:text-accent-500">Save</button>
+                    <button (click)="cancelEdit()" class="text-faint-foreground transition hover:text-foreground">Cancel</button>
+                  } @else {
+                    <button
+                      (click)="startEdit(chat.id, chat.name)"
+                      class="mr-3 text-muted-foreground transition hover:text-foreground"
+                    >
+                      Rename
+                    </button>
+                    <button (click)="deleteChat(chat)" class="text-danger transition hover:text-danger-600">
+                      Delete
+                    </button>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4" class="px-4 py-10 text-center text-faint-foreground">No public chats</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+    }
+
+  </main>
+</div>

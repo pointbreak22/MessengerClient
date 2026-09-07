@@ -3,7 +3,7 @@ import { MsalBroadcastService, MsalService } from '@azure/msal-angular';
 import {AccountInfo, AuthenticationResult, EventType, InteractionRequiredAuthError} from '@azure/msal-browser';
 import { filter, firstValueFrom } from 'rxjs';
 import { UserApiService } from '../../services/user-api.service';
-import { UserProfile } from '../../interfaces/user-profile';
+import { UserProfile, UserRole } from '../../interfaces/user-profile';
 import {apiScope, msalConfig} from './msal.config';
 
 @Injectable({ providedIn: 'root' })
@@ -25,6 +25,12 @@ export class AuthService {
   readonly currentAccount = this._currentAccount.asReadonly();
   readonly currentUserProfile = this._currentUserProfile.asReadonly();
   readonly isAuthenticated = computed(() => this._currentAccount() !== null);
+  // Only decides whether admin UI is offered. The API enforces the same rule
+  // server-side, so a forged value here buys nothing but a 403.
+  readonly isSuperAdmin = computed(() => this._currentUserProfile()?.role === UserRole.SuperAdmin);
+
+  // De-duplicates concurrent waits — see ensureProfileLoaded().
+  private profileLoad: Promise<void> | null = null;
 
   constructor() {
     this.broadcast.msalSubject$
@@ -61,6 +67,21 @@ export class AuthService {
     if (this._currentAccount()) {
       await this.loadCurrentUserProfile();
     }
+  }
+
+  // For anything that needs the profile to have arrived before it can decide —
+  // route guards in particular. The app initializer starts this load without
+  // awaiting it (so a cold backend can't hold up rendering), which means a
+  // guard running on a fresh page load can easily get there first and see a
+  // null profile. Awaiting the same in-flight promise avoids both a premature
+  // "no role, denied" and a duplicate request.
+  async ensureProfileLoaded(): Promise<void> {
+    if (this._currentUserProfile() || !this._currentAccount()) return;
+
+    this.profileLoad ??= this.loadCurrentUserProfile().finally(() => {
+      this.profileLoad = null;
+    });
+    await this.profileLoad;
   }
 
   // Called after a successful avatar/name change (Header) so the new value
