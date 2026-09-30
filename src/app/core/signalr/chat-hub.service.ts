@@ -39,7 +39,19 @@ export class ChatHubService {
 
   readonly connectionState = signal<HubConnectionState>(HubConnectionState.Disconnected);
 
+  constructor() {
+    // Sent by the admin panel's ban to this user's open tabs.
+    this.on('AccountBanned', () => {
+      this.auth.markBanned();
+      void this.disconnect();
+    });
+  }
+
   async connect(): Promise<void> {
+    // A blocked account's negotiate is always refused (403), so retrying
+    // would only loop forever.
+    if (this.auth.isBanned()) return;
+
     // Cleared first, before anything else looks at it: a retry loop that
     // disconnect() just told to stop may still be mid-sleep, and reviving it
     // is exactly right for the leave-and-come-back-to-/app case. Doing this
@@ -59,7 +71,7 @@ export class ChatHubService {
   }
 
   private async connectWithRetry(): Promise<void> {
-    for (let attempt = 0; !this.stopped; attempt++) {
+    for (let attempt = 0; !this.stopped && !this.auth.isBanned(); attempt++) {
       const connection = this.buildConnection();
 
       // Published BEFORE start(), not after. start() is a network round trip,

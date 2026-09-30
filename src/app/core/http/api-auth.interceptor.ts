@@ -1,6 +1,6 @@
-import { HttpInterceptorFn } from '@angular/common/http';
+import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { from, switchMap } from 'rxjs';
+import { catchError, from, switchMap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
 
@@ -28,6 +28,14 @@ export const apiAuthInterceptor: HttpInterceptorFn = (req, next) => {
         ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
         : req;
       return next(authReq);
+    }),
+    // BanEnforcementMiddleware answers every request of a blocked account with
+    // 403 { code: 'account_banned' }.
+    catchError((err: unknown) => {
+      if (err instanceof HttpErrorResponse && err.status === 403 && err.error?.code === 'account_banned') {
+        auth.markBanned();
+      }
+      return throwError(() => err);
     }),
   );
 };

@@ -90,6 +90,21 @@ export class Admin {
     }
   }
 
+  protected async toggleBan(user: AdminUser): Promise<void> {
+    if (!user.isBanned && !confirm(`Заблокировать ${user.userName}? Пользователь не сможет ничего писать и пропадёт у всех из списков.`)) {
+      return;
+    }
+
+    try {
+      const updated = await firstValueFrom(user.isBanned ? this.api.unbanUser(user.id) : this.api.banUser(user.id));
+      this.users.update((list) => list.map((u) => (u.id === updated.id ? updated : u)));
+    } catch {
+      this.error.set(user.isBanned
+        ? `Не удалось разблокировать ${user.userName}.`
+        : `Не удалось заблокировать ${user.userName}.`);
+    }
+  }
+
   protected async saveChat(chat: AdminChat): Promise<void> {
     const name = this.draft().trim();
     if (!name || name === chat.name) return this.cancelEdit();

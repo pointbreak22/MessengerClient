@@ -93,7 +93,11 @@
                 </td>
 
                 <td class="px-4 py-2.5">
-                  @if (user.isOnline) {
+                  @if (user.isBanned) {
+                    <span class="rounded-md bg-danger/15 px-2 py-0.5 text-[10px] font-medium text-danger">
+                      banned
+                    </span>
+                  } @else if (user.isOnline) {
                     <span class="text-online">online</span>
                   } @else {
                     <span class="text-faint-foreground">{{ formatLastSeen(user.lastSeenAt) }}</span>
@@ -111,6 +115,17 @@
                     >
                       Rename
                     </button>
+                    @if (user.role !== UserRole.SuperAdmin) {
+                      <button
+                        (click)="toggleBan(user)"
+                        class="ml-3 transition"
+                        [class]="user.isBanned
+                          ? 'text-accent-400 hover:text-accent-500'
+                          : 'text-danger hover:text-danger-600'"
+                      >
+                        {{ user.isBanned ? 'Unban' : 'Ban' }}
+                      </button>
+                    }
                   }
                 </td>
               </tr>

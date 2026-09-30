@@ -4,6 +4,8 @@ export const ApiEndpoints = {
   admin: {
     users: '/admin/users',
     user: (id: string) => `/admin/users/${id}`,
+    ban: (id: string) => `/admin/users/${id}/ban`,
+    unban: (id: string) => `/admin/users/${id}/unban`,
     chats: '/admin/chats',
     chat: (chatId: string) => `/admin/chats/${chatId}`,
   },

@@ -16,6 +16,8 @@ export interface AdminUser {
   isOnline: boolean;
   lastSeenAt: string;
   avatarUrl: string | null;
+  isBanned: boolean;
+  bannedAt: string | null;
 }
 
 export interface AdminChat {
@@ -48,6 +50,16 @@ export class AdminApiService {
 
   renameUser(id: string, userName: string): Observable<AdminUser> {
     return this.http.put<AdminUser>(`${this.base}${ApiEndpoints.admin.user(id)}`, { userName });
+  }
+
+  // A banned user can't call the API or the hub and is hidden from everyone
+  // else (search, friends, chats, messages). Nothing is deleted: unban restores it.
+  banUser(id: string): Observable<AdminUser> {
+    return this.http.post<AdminUser>(`${this.base}${ApiEndpoints.admin.ban(id)}`, {});
+  }
+
+  unbanUser(id: string): Observable<AdminUser> {
+    return this.http.post<AdminUser>(`${this.base}${ApiEndpoints.admin.unban(id)}`, {});
   }
 
   listPublicChats(page = 1, pageSize = 50, search?: string): Observable<AdminPage<AdminChat>> {

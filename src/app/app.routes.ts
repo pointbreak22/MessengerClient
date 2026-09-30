@@ -35,6 +35,12 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/auth/login/login').then((m) => m.Login),
   },
   {
+    // Where AuthService.markBanned() sends a blocked account. No guard: the
+    // account is signed in, it just isn't allowed to do anything.
+    path: 'banned',
+    loadComponent: () => import('./pages/auth/banned/banned').then((m) => m.Banned),
+  },
+  {
     // MsalGuard first so an anonymous visitor is sent to sign in rather than
     // silently bounced; superAdminGuard then checks the role.
     path: 'admin',

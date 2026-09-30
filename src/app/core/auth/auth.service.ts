@@ -46,6 +46,10 @@ export class AuthService {
   // still in flight.
   private loginInProgress = false;
 
+  // Set when the API/hub reports "account_banned" (see markBanned()).
+  private readonly _isBanned = signal(false);
+  readonly isBanned = this._isBanned.asReadonly();
+
   readonly currentAccount = this._currentAccount.asReadonly();
   readonly currentUserProfile = this._currentUserProfile.asReadonly();
   readonly isAuthenticated = computed(() => this._currentAccount() !== null);
@@ -130,6 +134,15 @@ export class AuthService {
         this.loginInProgress = false;
       },
     });
+  }
+
+  // The server blocked this account (403 account_banned from the API, or the
+  // hub's AccountBanned event). Nothing else in the app works for it any more,
+  // so it is taken to a page that only offers signing out.
+  markBanned(): void {
+    if (this._isBanned()) return;
+    this._isBanned.set(true);
+    void this.router.navigateByUrl('/banned');
   }
 
   // For code paths that find the session gone (Dashboard). Sends the visitor

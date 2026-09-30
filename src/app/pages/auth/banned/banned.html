@@ -1,0 +1,34 @@
+<div class="flex min-h-dvh items-center justify-center bg-background px-4 text-foreground">
+  <div class="w-full max-w-[420px]">
+
+    <div class="mb-8 flex flex-col items-center text-center">
+      <img
+        src="/logo-192.png"
+        alt="PBMessenger"
+        class="h-12 w-12 rounded-2xl object-cover"
+      />
+
+      <h1 class="mt-5 text-xl font-semibold tracking-tight">
+        Account blocked
+      </h1>
+
+      <p class="mt-2 text-sm text-faint-foreground">
+        This account has been blocked by the administrator.
+        You can't send messages or use the messenger with it.
+      </p>
+    </div>
+
+    <div class="rounded-2xl border border-border bg-surface-elevated p-6">
+      <button
+        type="button"
+        (click)="signOut()"
+        class="flex h-11 w-full items-center justify-center rounded-xl
+               border border-border-strong text-sm font-medium text-foreground
+               transition hover:bg-surface-hover"
+      >
+        Sign out
+      </button>
+    </div>
+
+  </div>
+</div>
