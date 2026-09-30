@@ -1,16 +1,40 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { MsalBroadcastService, MsalService } from '@azure/msal-angular';
-import {AccountInfo, AuthenticationResult, EventType, InteractionRequiredAuthError} from '@azure/msal-browser';
+import {AccountInfo, AuthError, AuthenticationResult, EventType} from '@azure/msal-browser';
 import { filter, firstValueFrom } from 'rxjs';
 import { UserApiService } from '../../services/user-api.service';
 import { UserProfile, UserRole } from '../../interfaces/user-profile';
 import {apiScope, msalConfig} from './msal.config';
+
+// Silent acquisition failures that only mean "no network right now". Every
+// other failure means the cached session can't be renewed without the user:
+// InteractionRequiredAuthError, but also BrowserAuthError "timed_out" — the
+// hidden-iframe renewal that runs once the refresh token has expired, and which
+// always times out when the browser blocks third-party cookies for
+// ciamlogin.com. That second case was the "opens as an empty account, works
+// only after Log out + Log in" bug: it isn't an InteractionRequiredAuthError,
+// so the dead account stayed in place and every request went out without a token.
+const TRANSIENT_AUTH_ERRORS = new Set(['no_network_connectivity', 'post_request_failed']);
+
+// Automatic sign-in redirects are rate-limited per tab. If the API keeps
+// rejecting fresh tokens (misconfiguration, clock skew), redirecting on every
+// load would bounce between the app and the sign-in page forever; after the
+// first automatic attempt the visitor lands on /login and presses the button.
+const AUTO_LOGIN_KEY = 'auth.autoLoginAt';
+const AUTO_LOGIN_COOLDOWN_MS = 2 * 60 * 1000;
+
+// Profile load retries cover the free-tier backend cold start: the first
+// requests after idle time out or answer 5xx for a while.
+const PROFILE_RETRY_DELAYS_MS = [2000, 4000, 8000, 16000];
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly msal = inject(MsalService);
   private readonly broadcast = inject(MsalBroadcastService);
   private readonly userApi = inject(UserApiService);
+  private readonly router = inject(Router);
 
   private readonly _currentAccount = signal<AccountInfo | null>(this.msal.instance.getActiveAccount());
   private readonly _currentUserProfile = signal<UserProfile | null>(null);
@@ -108,6 +132,33 @@ export class AuthService {
     });
   }
 
+  // For code paths that find the session gone (Dashboard). Sends the visitor
+  // straight to the sign-in page instead of leaving an empty shell on screen,
+  // unless an automatic redirect already happened moments ago — see
+  // AUTO_LOGIN_COOLDOWN_MS.
+  signInAgain(): void {
+    if (this.loginInProgress) return;
+
+    let lastAttempt = 0;
+    try {
+      lastAttempt = Number(sessionStorage.getItem(AUTO_LOGIN_KEY)) || 0;
+    } catch {
+      /* storage blocked: treat as no previous attempt */
+    }
+
+    if (Date.now() - lastAttempt < AUTO_LOGIN_COOLDOWN_MS) {
+      void this.router.navigateByUrl('/login');
+      return;
+    }
+
+    try {
+      sessionStorage.setItem(AUTO_LOGIN_KEY, String(Date.now()));
+    } catch {
+      /* best-effort */
+    }
+    this.login();
+  }
+
   logout(): void {
     const activeAccount = this.msal.instance.getActiveAccount()
       ?? this._currentAccount()
@@ -129,8 +180,9 @@ export class AuthService {
   // errors) just return null instead of forcing an interactive redirect —
   // auto-triggering acquireTokenRedirect for *those* caused a login-window
   // reload loop, since every failing request fired its own redirect.
-  // InteractionRequiredAuthError is different: it specifically means the
-  // cached session/refresh token is dead (expired, revoked in Entra, etc.) —
+  // A failure that isn't a network error (see TRANSIENT_AUTH_ERRORS) is
+  // different: it means the cached session/refresh token is dead (expired,
+  // revoked in Entra, iframe renewal blocked by the browser, etc.) —
   // no amount of retrying silently will ever succeed, only an interactive
   // login can recover. Without handling it, _currentAccount stays set from
   // localStorage, isAuthenticated stays true, and the app sits there rendering
@@ -164,8 +216,8 @@ export class AuthService {
       return result.accessToken;
     } catch (err) {
       console.warn('MSAL silent token acquisition failed:', err);
-      if (err instanceof InteractionRequiredAuthError) {
-        this.triggerReauth();
+      if (!(err instanceof AuthError && TRANSIENT_AUTH_ERRORS.has(err.errorCode))) {
+        void this.triggerReauth();
       }
       return null;
     }
@@ -178,11 +230,13 @@ export class AuthService {
   // ClientAuthError: state_mismatch. Clearing local state here just makes
   // isAuthenticated/currentUserProfile stop lying about a session that's dead;
   // the guard is the single place that owns re-authenticating.
-  private triggerReauth(): void {
+  //
+  // The MSAL cache is cleared first and the signals reset afterwards:
+  // resetting _currentAccount is what makes Dashboard start the sign-in
+  // redirect, and that redirect must not overlap with clearCache().
+  private async triggerReauth(): Promise<void> {
     if (this.reauthTriggered) return;
     this.reauthTriggered = true;
-    this._currentAccount.set(null);
-    this._currentUserProfile.set(null);
 
     // Clearing the Angular signals alone was not enough, and this was the
     // "I have to press Log out before it will let me sign in again" bug.
@@ -195,21 +249,40 @@ export class AuthService {
     // makes the next load start genuinely signed out instead.
     try {
       this.msal.instance.setActiveAccount(null);
-      void this.msal.instance.clearCache().catch(() => {});
+      await this.msal.instance.clearCache();
     } catch {
-      /* best-effort: the signals above are already reset either way */
+      /* best-effort: the signals below are reset either way */
     }
+
+    this._currentAccount.set(null);
+    this._currentUserProfile.set(null);
   }
 
   private async loadCurrentUserProfile(): Promise<void> {
     // Защита от повторного вызова, если профиль уже загружен
     if (this._currentUserProfile()) return;
 
-    try {
-      const profile = await firstValueFrom(this.userApi.getMe());
-      this._currentUserProfile.set(profile);
-    } catch (err) {
-      console.error('Failed to load user profile:', err);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const profile = await firstValueFrom(this.userApi.getMe());
+        this._currentUserProfile.set(profile);
+        return;
+      } catch (err) {
+        // 401 with a token attached: the API no longer accepts this session.
+        // A request sent without a token (silent acquisition failed) has
+        // already started re-authentication in getAccessToken().
+        if (err instanceof HttpErrorResponse && err.status === 401) {
+          if (this._currentAccount()) void this.triggerReauth();
+          return;
+        }
+
+        const transient = err instanceof HttpErrorResponse && (err.status === 0 || err.status >= 500);
+        if (!transient || attempt >= PROFILE_RETRY_DELAYS_MS.length || !this._currentAccount()) {
+          console.error('Failed to load user profile:', err);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, PROFILE_RETRY_DELAYS_MS[attempt]));
+      }
     }
   }
 }

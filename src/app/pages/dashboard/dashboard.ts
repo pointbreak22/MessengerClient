@@ -49,9 +49,12 @@ export class Dashboard implements OnDestroy {
     // method's comment for why), nothing else would ever send the user back
     // to login. This is the single, uncontested place that does — unlike
     // MsalGuard's own redirect, there's nothing else racing it at this point.
+    // The same path covers a session restored from localStorage that turns
+    // out to be dead on page load, so the visitor goes straight to sign-in
+    // instead of seeing an empty account.
     effect(() => {
       if (!this.auth.isAuthenticated()) {
-        this.auth.login();
+        this.auth.signInAgain();
       }
     });
 
