@@ -2,10 +2,12 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HubConnection, HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
+import { ContentViolation, ModerationNoticeStore } from '../moderation/moderation-notice.store';
 
 @Injectable({ providedIn: 'root' })
 export class ChatHubService {
   private readonly auth = inject(AuthService);
+  private readonly moderationNotice = inject(ModerationNoticeStore);
   private connection: HubConnection | null = null;
   // Stores/services register listeners in their constructors, which can run
   // before Dashboard calls connect() (e.g. ChatStore/UserStore are injected
@@ -45,6 +47,10 @@ export class ChatHubService {
       this.auth.markBanned();
       void this.disconnect();
     });
+
+    // Auto-moderation rejected text sent through a hub method (REST callers
+    // get the same payload as a 422, handled by apiAuthInterceptor).
+    this.on<ContentViolation>('ContentViolation', (violation) => this.moderationNotice.show(violation));
   }
 
   async connect(): Promise<void> {

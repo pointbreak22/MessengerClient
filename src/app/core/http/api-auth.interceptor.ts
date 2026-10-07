@@ -3,6 +3,7 @@ import { inject } from '@angular/core';
 import { catchError, from, switchMap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
+import { asContentViolation, ModerationNoticeStore } from '../moderation/moderation-notice.store';
 
 // Replaces @azure/msal-angular's MsalInterceptor. That one auto-fires a full-page
 // acquireTokenRedirect the instant silent token acquisition fails for any protected
@@ -22,6 +23,7 @@ export const apiAuthInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   const auth = inject(AuthService);
+  const moderationNotice = inject(ModerationNoticeStore);
   return from(auth.getAccessToken()).pipe(
     switchMap((token) => {
       const authReq = token
@@ -35,6 +37,10 @@ export const apiAuthInterceptor: HttpInterceptorFn = (req, next) => {
       if (err instanceof HttpErrorResponse && err.status === 403 && err.error?.code === 'account_banned') {
         auth.markBanned();
       }
+      // Auto-moderation rejected the text (422 content_violation) — show why,
+      // whichever screen sent it. Callers may still react (e.g. restore a draft).
+      const violation = asContentViolation(err);
+      if (violation) moderationNotice.show(violation);
       return throwError(() => err);
     }),
   );

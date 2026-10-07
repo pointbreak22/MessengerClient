@@ -7,6 +7,7 @@ import { Avatar } from '../../components/avatar/avatar';
 import { EmojiPicker } from '../../components/emoji-picker/emoji-picker';
 import { Icon } from '../../components/icon/icon';
 import { AuthService } from '../../core/auth/auth.service';
+import { asContentViolation } from '../../core/moderation/moderation-notice.store';
 import { CallService } from '../../core/signalr/call.service';
 import { ChatHubService } from '../../core/signalr/chat-hub.service';
 import { GroupCallService } from '../../core/signalr/group-call.service';
@@ -228,6 +229,11 @@ export class Chat {
     try {
       await this.messageStore.editMessage(message.id, text);
       this.editingMessageId.set(null);
+    } catch (err) {
+      // Rejected by auto-moderation: stay in edit mode with the softened text.
+      const violation = asContentViolation(err);
+      if (!violation) throw err;
+      if (violation.suggestion && !violation.banned) this.editDraft.set(violation.suggestion);
     } finally {
       this.savingEdit.set(false);
     }
@@ -291,7 +297,19 @@ export class Chat {
     const chat = this.chat();
     const text = this.draft().trim();
     if (!chat || !text) return;
-    void this.messageStore.sendMessage(chat.id, text, null, this.replyingTo()?.id ?? null);
+    const replyTo = this.replyingTo();
+    this.messageStore.sendMessage(chat.id, text, null, replyTo?.id ?? null).catch((err: unknown) => {
+      // Auto-moderation rejected it (the notice itself is shown by the
+      // interceptor). Put the softened suggestion — or the original text, if
+      // there is none — back into this chat's draft so nothing typed is lost,
+      // unless something new has been typed there meanwhile.
+      const violation = asContentViolation(err);
+      if (!violation) throw err;
+      if (violation.banned) return;
+      if (this.draftsByChat()[chat.id]) return;
+      this.draftsByChat.update((map) => ({ ...map, [chat.id]: violation.suggestion ?? text }));
+      if (this.chat()?.id === chat.id && !this.replyingTo()) this.replyingTo.set(replyTo);
+    });
     this.clearDraft(chat.id);
     this.replyingTo.set(null);
   }

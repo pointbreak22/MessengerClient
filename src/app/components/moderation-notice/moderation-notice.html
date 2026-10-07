@@ -1,0 +1,41 @@
+@if (store.notice(); as notice) {
+  <div class="fixed inset-x-0 top-0 z-[70] flex justify-center px-4 pt-4">
+    <div
+      role="alert"
+      class="flex w-full max-w-md items-start gap-3
+             rounded-2xl border border-danger/40
+             bg-surface-elevated p-4
+             shadow-2xl shadow-black/30"
+    >
+      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-danger/15 text-danger">
+        <svg appIcon="lock" class="h-4 w-4"></svg>
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <p class="text-xs font-semibold text-foreground">
+          @if (notice.banned) {
+            Аккаунт заблокирован
+          } @else if (notice.strike > 0) {
+            Предупреждение {{ notice.strike }} из {{ notice.maxStrikes - 1 }}
+          } @else {
+            Недопустимые слова
+          }
+        </p>
+        <p class="mt-0.5 text-[11px] text-muted-foreground">{{ notice.message }}</p>
+        @if (notice.suggestion && notice.target === 'message' && !notice.banned) {
+          <p class="mt-1.5 text-[11px] text-faint-foreground">
+            Исправленный вариант подставлен в поле ввода — проверьте и отправьте.
+          </p>
+        }
+      </div>
+
+      <button
+        (click)="dismiss()"
+        aria-label="Закрыть"
+        class="shrink-0 rounded-lg p-1 text-faint-foreground transition hover:bg-surface-hover hover:text-foreground"
+      >
+        <svg appIcon="close" class="h-4 w-4"></svg>
+      </button>
+    </div>
+  </div>
+}
