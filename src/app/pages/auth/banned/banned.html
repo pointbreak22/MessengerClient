@@ -8,14 +8,25 @@
         class="h-12 w-12 rounded-2xl object-cover"
       />
 
-      <h1 class="mt-5 text-xl font-semibold tracking-tight">
-        Account blocked
-      </h1>
+      @if (banKind() === 'ip') {
+        <h1 class="mt-5 text-xl font-semibold tracking-tight">
+          Access blocked
+        </h1>
 
-      <p class="mt-2 text-sm text-faint-foreground">
-        This account has been blocked by the administrator.
-        You can't send messages or use the messenger with it.
-      </p>
+        <p class="mt-2 text-sm text-faint-foreground">
+          Access from your network (IP address) has been blocked after repeated
+          rule violations from it. If you think this is a mistake, contact the administrator.
+        </p>
+      } @else {
+        <h1 class="mt-5 text-xl font-semibold tracking-tight">
+          Account blocked
+        </h1>
+
+        <p class="mt-2 text-sm text-faint-foreground">
+          This account has been blocked by the administrator.
+          You can't send messages or use the messenger with it.
+        </p>
+      }
     </div>
 
     <div class="rounded-2xl border border-border bg-surface-elevated p-6">

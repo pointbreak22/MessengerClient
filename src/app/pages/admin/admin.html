@@ -1,7 +1,7 @@
 <div class="min-h-dvh bg-background text-foreground">
 
   <header class="sticky top-0 z-10 border-b border-border bg-surface/95 backdrop-blur">
-    <div class="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
+    <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
       <button
         (click)="back()"
         title="Back to messenger"
@@ -12,30 +12,24 @@
 
       <h1 class="text-sm font-semibold tracking-tight">Admin</h1>
 
-      <div class="ml-auto flex items-center gap-1 rounded-lg border border-border p-0.5">
-        <button
-          (click)="switchTab('users')"
-          class="rounded-md px-3 py-1.5 text-xs font-medium transition"
-          [class]="tab() === 'users'
-            ? 'bg-accent-500 text-white'
-            : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'"
-        >
-          Users
-        </button>
-        <button
-          (click)="switchTab('chats')"
-          class="rounded-md px-3 py-1.5 text-xs font-medium transition"
-          [class]="tab() === 'chats'
-            ? 'bg-accent-500 text-white'
-            : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'"
-        >
-          Public chats
-        </button>
+      <!-- Own row on phones so three tabs never squeeze the title off-screen. -->
+      <div class="flex w-full items-center gap-1 rounded-lg border border-border p-0.5 sm:ml-auto sm:w-auto">
+        @for (t of [['users', 'Users'], ['chats', 'Public chats'], ['ipBans', 'IP bans']]; track t[0]) {
+          <button
+            (click)="switchTab($any(t[0]))"
+            class="flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition sm:flex-none"
+            [class]="tab() === t[0]
+              ? 'bg-accent-500 text-white'
+              : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'"
+          >
+            {{ t[1] }}
+          </button>
+        }
       </div>
     </div>
   </header>
 
-  <main class="mx-auto max-w-5xl px-4 py-5">
+  <main class="mx-auto max-w-6xl px-4 py-5">
 
     @if (error(); as err) {
       <div class="mb-4 flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3">
@@ -50,95 +44,107 @@
       <p class="py-10 text-center text-xs text-faint-foreground">Loading…</p>
     } @else if (tab() === 'users') {
 
-      <div class="overflow-hidden rounded-xl border border-border">
+      <!-- ===== Phones and tablets (incl. landscape): one card per user ===== -->
+      <div class="space-y-2 lg:hidden">
+        @for (user of users(); track user.id) {
+          <div class="rounded-xl border border-border bg-surface p-3">
+            <div class="flex items-start gap-2">
+              <div class="min-w-0 flex-1">
+                <ng-container *ngTemplateOutlet="nameCell; context: { $implicit: user }" />
+                <p class="mt-0.5 truncate text-[11px] text-muted-foreground">{{ user.email ?? '—' }}</p>
+              </div>
+              <div class="shrink-0 text-[11px]">
+                <ng-container *ngTemplateOutlet="statusCell; context: { $implicit: user }" />
+              </div>
+            </div>
+
+            <dl class="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+              <div class="min-w-0">
+                <dt class="text-faint-foreground">IP</dt>
+                <dd class="mt-0.5"><ng-container *ngTemplateOutlet="ipCell; context: { $implicit: user }" /></dd>
+              </div>
+              <div>
+                <dt class="text-faint-foreground">Strikes</dt>
+                <dd class="mt-0.5"><ng-container *ngTemplateOutlet="strikesCell; context: { $implicit: user }" /></dd>
+              </div>
+            </dl>
+
+            <div class="mt-3 flex flex-wrap gap-2">
+              <ng-container *ngTemplateOutlet="userActions; context: { $implicit: user, pill: true }" />
+            </div>
+
+            @if (expandedUserId() === user.id) {
+              <ng-container *ngTemplateOutlet="violationsPanel; context: { $implicit: user }" />
+            }
+          </div>
+        } @empty {
+          <p class="rounded-xl border border-border px-4 py-10 text-center text-xs text-faint-foreground">No users yet</p>
+        }
+      </div>
+
+      <!-- ===== Desktop: table ===== -->
+      <div class="hidden overflow-x-auto rounded-xl border border-border lg:block">
         <table class="w-full text-left text-xs">
           <thead class="bg-surface-alt text-faint-foreground">
             <tr>
               <th class="px-4 py-2.5 font-medium">Name</th>
               <th class="px-4 py-2.5 font-medium">Login</th>
-              <th class="px-4 py-2.5 font-medium">Role</th>
+              <th class="px-4 py-2.5 font-medium">IP</th>
+              <th class="px-4 py-2.5 font-medium">Strikes</th>
               <th class="px-4 py-2.5 font-medium">Status</th>
               <th class="px-4 py-2.5"></th>
             </tr>
           </thead>
           <tbody>
             @for (user of users(); track user.id) {
-              <tr class="border-t border-border">
-                <td class="px-4 py-2.5">
-                  @if (editingId() === user.id) {
-                    <input
-                      [value]="draft()"
-                      (input)="onDraftInput($event)"
-                      (keydown.enter)="saveUser(user)"
-                      (keydown.escape)="cancelEdit()"
-                      autofocus
-                      class="w-full rounded-md border border-border-strong bg-surface px-2 py-1 text-xs
-                             text-foreground outline-none focus:border-accent-500"
-                    />
-                  } @else {
-                    <span class="text-foreground">{{ user.userName }}</span>
-                  }
-                </td>
-
-                <td class="px-4 py-2.5 text-muted-foreground">{{ user.email ?? '—' }}</td>
-
-                <td class="px-4 py-2.5">
-                  @if (user.role === UserRole.SuperAdmin) {
-                    <span class="rounded-md bg-accent-500/15 px-2 py-0.5 text-[10px] font-medium text-accent-400">
-                      superadmin
-                    </span>
-                  } @else {
-                    <span class="text-faint-foreground">user</span>
-                  }
-                </td>
-
-                <td class="px-4 py-2.5">
-                  @if (user.isBanned) {
-                    <span class="rounded-md bg-danger/15 px-2 py-0.5 text-[10px] font-medium text-danger">
-                      banned
-                    </span>
-                  } @else if (user.isOnline) {
-                    <span class="text-online">online</span>
-                  } @else {
-                    <span class="text-faint-foreground">{{ formatLastSeen(user.lastSeenAt) }}</span>
-                  }
-                </td>
-
-                <td class="px-4 py-2.5 text-right">
-                  @if (editingId() === user.id) {
-                    <button (click)="saveUser(user)" class="mr-2 text-accent-400 transition hover:text-accent-500">Save</button>
-                    <button (click)="cancelEdit()" class="text-faint-foreground transition hover:text-foreground">Cancel</button>
-                  } @else {
-                    <button
-                      (click)="startEdit(user.id, user.userName)"
-                      class="text-muted-foreground transition hover:text-foreground"
-                    >
-                      Rename
-                    </button>
-                    @if (user.role !== UserRole.SuperAdmin) {
-                      <button
-                        (click)="toggleBan(user)"
-                        class="ml-3 transition"
-                        [class]="user.isBanned
-                          ? 'text-accent-400 hover:text-accent-500'
-                          : 'text-danger hover:text-danger-600'"
-                      >
-                        {{ user.isBanned ? 'Unban' : 'Ban' }}
-                      </button>
-                    }
-                  }
+              <tr class="border-t border-border align-top">
+                <td class="px-4 py-2.5"><ng-container *ngTemplateOutlet="nameCell; context: { $implicit: user }" /></td>
+                <td class="max-w-56 truncate px-4 py-2.5 text-muted-foreground">{{ user.email ?? '—' }}</td>
+                <td class="px-4 py-2.5"><ng-container *ngTemplateOutlet="ipCell; context: { $implicit: user }" /></td>
+                <td class="px-4 py-2.5"><ng-container *ngTemplateOutlet="strikesCell; context: { $implicit: user }" /></td>
+                <td class="px-4 py-2.5"><ng-container *ngTemplateOutlet="statusCell; context: { $implicit: user }" /></td>
+                <td class="whitespace-nowrap px-4 py-2.5 text-right">
+                  <ng-container *ngTemplateOutlet="userActions; context: { $implicit: user, pill: false }" />
                 </td>
               </tr>
+              @if (expandedUserId() === user.id) {
+                <tr class="bg-surface-alt/50">
+                  <td colspan="6" class="px-4 pb-3">
+                    <ng-container *ngTemplateOutlet="violationsPanel; context: { $implicit: user }" />
+                  </td>
+                </tr>
+              }
             } @empty {
-              <tr><td colspan="5" class="px-4 py-10 text-center text-faint-foreground">No users yet</td></tr>
+              <tr><td colspan="6" class="px-4 py-10 text-center text-faint-foreground">No users yet</td></tr>
             }
           </tbody>
         </table>
       </div>
 
-    } @else {
+    } @else if (tab() === 'chats') {
 
-      <div class="overflow-hidden rounded-xl border border-border">
+      <!-- Phones: cards -->
+      <div class="space-y-2 md:hidden">
+        @for (chat of chats(); track chat.id) {
+          <div class="rounded-xl border border-border bg-surface p-3">
+            <div class="flex items-start gap-2">
+              <div class="min-w-0 flex-1">
+                <ng-container *ngTemplateOutlet="chatName; context: { $implicit: chat }" />
+                <p class="mt-0.5 text-[11px] text-faint-foreground">{{ chat.memberCount }} members</p>
+              </div>
+              <ng-container *ngTemplateOutlet="chatVisibility; context: { $implicit: chat }" />
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <ng-container *ngTemplateOutlet="chatActions; context: { $implicit: chat, pill: true }" />
+            </div>
+          </div>
+        } @empty {
+          <p class="rounded-xl border border-border px-4 py-10 text-center text-xs text-faint-foreground">No public chats</p>
+        }
+      </div>
+
+      <!-- Wider screens: table -->
+      <div class="hidden overflow-x-auto rounded-xl border border-border md:block">
         <table class="w-full text-left text-xs">
           <thead class="bg-surface-alt text-faint-foreground">
             <tr>
@@ -151,52 +157,11 @@
           <tbody>
             @for (chat of chats(); track chat.id) {
               <tr class="border-t border-border">
-                <td class="px-4 py-2.5">
-                  @if (editingId() === chat.id) {
-                    <input
-                      [value]="draft()"
-                      (input)="onDraftInput($event)"
-                      (keydown.enter)="saveChat(chat)"
-                      (keydown.escape)="cancelEdit()"
-                      autofocus
-                      class="w-full rounded-md border border-border-strong bg-surface px-2 py-1 text-xs
-                             text-foreground outline-none focus:border-accent-500"
-                    />
-                  } @else {
-                    <span class="text-foreground">{{ chat.name ?? '—' }}</span>
-                  }
-                </td>
-
+                <td class="px-4 py-2.5"><ng-container *ngTemplateOutlet="chatName; context: { $implicit: chat }" /></td>
                 <td class="px-4 py-2.5 text-muted-foreground">{{ chat.memberCount }}</td>
-
-                <td class="px-4 py-2.5">
-                  <button
-                    (click)="togglePublic(chat)"
-                    [title]="chat.isPublic ? 'Make private' : 'Make public'"
-                    class="rounded-md px-2 py-0.5 text-[10px] font-medium transition"
-                    [class]="chat.isPublic
-                      ? 'bg-online/15 text-online hover:bg-online/25'
-                      : 'bg-surface-hover text-faint-foreground hover:text-foreground'"
-                  >
-                    {{ chat.isPublic ? 'public' : 'private' }}
-                  </button>
-                </td>
-
-                <td class="px-4 py-2.5 text-right">
-                  @if (editingId() === chat.id) {
-                    <button (click)="saveChat(chat)" class="mr-2 text-accent-400 transition hover:text-accent-500">Save</button>
-                    <button (click)="cancelEdit()" class="text-faint-foreground transition hover:text-foreground">Cancel</button>
-                  } @else {
-                    <button
-                      (click)="startEdit(chat.id, chat.name)"
-                      class="mr-3 text-muted-foreground transition hover:text-foreground"
-                    >
-                      Rename
-                    </button>
-                    <button (click)="deleteChat(chat)" class="text-danger transition hover:text-danger-600">
-                      Delete
-                    </button>
-                  }
+                <td class="px-4 py-2.5"><ng-container *ngTemplateOutlet="chatVisibility; context: { $implicit: chat }" /></td>
+                <td class="whitespace-nowrap px-4 py-2.5 text-right">
+                  <ng-container *ngTemplateOutlet="chatActions; context: { $implicit: chat, pill: false }" />
                 </td>
               </tr>
             } @empty {
@@ -206,7 +171,308 @@
         </table>
       </div>
 
+    } @else {
+
+      <!-- ===== IP bans ===== -->
+      <form
+        (submit)="$event.preventDefault(); submitIpBan()"
+        class="mb-4 grid gap-2 rounded-xl border border-border bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_5rem_auto]"
+      >
+        <input
+          [value]="newIp()"
+          (input)="onInput('ip', $event)"
+          placeholder="IP address"
+          inputmode="decimal"
+          class="rounded-lg border border-border-strong bg-surface-alt px-3 py-2 text-xs text-foreground outline-none focus:border-accent-500"
+        />
+        <input
+          [value]="newIpReason()"
+          (input)="onInput('reason', $event)"
+          placeholder="Reason (optional)"
+          class="rounded-lg border border-border-strong bg-surface-alt px-3 py-2 text-xs text-foreground outline-none focus:border-accent-500"
+        />
+        <input
+          [value]="newIpDays()"
+          (input)="onInput('days', $event)"
+          type="number"
+          min="0"
+          title="Days, 0 = permanent"
+          class="rounded-lg border border-border-strong bg-surface-alt px-3 py-2 text-xs text-foreground outline-none focus:border-accent-500"
+        />
+        <button
+          type="submit"
+          [disabled]="!newIp().trim()"
+          class="rounded-lg bg-danger px-4 py-2 text-xs font-semibold text-white transition hover:bg-danger-600 disabled:opacity-40"
+        >
+          Ban IP
+        </button>
+        <p class="text-[11px] text-faint-foreground sm:col-span-4">
+          Days: 0 — permanent. A ban never applies to the superadmin. Automatic bans are added when
+          several different accounts break the rules from one IP.
+        </p>
+      </form>
+
+      <div class="space-y-2">
+        @for (ban of ipBans(); track ban.id) {
+          <div class="flex flex-wrap items-start gap-x-3 gap-y-2 rounded-xl border border-border bg-surface p-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-mono text-xs text-foreground">{{ ban.ipAddress }}</span>
+                <span
+                  class="rounded-md px-2 py-0.5 text-[10px] font-medium"
+                  [class]="ban.isAutomatic ? 'bg-busy/15 text-busy' : 'bg-surface-hover text-muted-foreground'"
+                >
+                  {{ ban.isAutomatic ? 'auto' : 'manual' }}
+                </span>
+              </div>
+              <p class="mt-1 break-words text-[11px] text-muted-foreground">{{ ban.reason }}</p>
+              <p class="mt-0.5 text-[11px] text-faint-foreground">
+                {{ formatDate(ban.createdAt) }} → {{ ban.expiresAt ? formatDate(ban.expiresAt) : 'permanent' }}
+              </p>
+            </div>
+            <button
+              (click)="unbanIp(ban)"
+              class="shrink-0 rounded-lg border border-border-strong px-3 py-1.5 text-xs text-accent-400 transition hover:bg-surface-hover"
+            >
+              Unban
+            </button>
+          </div>
+        } @empty {
+          <p class="rounded-xl border border-border px-4 py-10 text-center text-xs text-faint-foreground">No banned IPs</p>
+        }
+      </div>
+
     }
 
   </main>
 </div>
+
+<!-- ================= shared cell templates ================= -->
+
+<ng-template #nameCell let-user>
+  @if (editingId() === user.id) {
+    <input
+      [value]="draft()"
+      (input)="onDraftInput($event)"
+      (keydown.enter)="saveUser(user)"
+      (keydown.escape)="cancelEdit()"
+      autofocus
+      class="w-full rounded-md border border-border-strong bg-surface px-2 py-1 text-xs
+             text-foreground outline-none focus:border-accent-500"
+    />
+  } @else {
+    <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+      <span class="truncate text-xs font-medium text-foreground">{{ user.userName }}</span>
+      @if (user.role === UserRole.SuperAdmin) {
+        <span class="rounded-md bg-accent-500/15 px-1.5 py-0.5 text-[10px] font-medium text-accent-400">superadmin</span>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #statusCell let-user>
+  @if (user.isBanned) {
+    <span class="rounded-md bg-danger/15 px-2 py-0.5 text-[10px] font-medium text-danger">banned</span>
+  } @else if (user.isOnline) {
+    <span class="text-online">online</span>
+  } @else {
+    <span class="text-faint-foreground">{{ formatLastSeen(user.lastSeenAt) }}</span>
+  }
+</ng-template>
+
+<ng-template #ipCell let-user>
+  @if (user.lastIpAddress) {
+    <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+      <span class="truncate font-mono text-muted-foreground">{{ user.lastIpAddress }}</span>
+      @if (isIpBanned(user.lastIpAddress)) {
+        <span class="rounded-md bg-danger/15 px-1.5 py-0.5 text-[10px] font-medium text-danger">IP banned</span>
+      }
+    </div>
+  } @else {
+    <span class="text-faint-foreground">—</span>
+  }
+</ng-template>
+
+<ng-template #strikesCell let-user>
+  @if (user.moderationStrikes > 0) {
+    <span
+      class="rounded-md px-2 py-0.5 text-[10px] font-medium"
+      [class]="user.moderationStrikes >= 2 ? 'bg-danger/15 text-danger' : 'bg-busy/15 text-busy'"
+      [title]="'Last: ' + formatDate(user.lastStrikeAt)"
+    >
+      {{ user.moderationStrikes }} {{ user.moderationStrikes === 1 ? 'strike' : 'strikes' }}
+    </span>
+  } @else {
+    <span class="text-faint-foreground">0</span>
+  }
+</ng-template>
+
+<!-- pill = bordered, touch-sized buttons for the card layout; plain links in the table. -->
+<ng-template #userActions let-user let-pill="pill">
+  @if (editingId() === user.id) {
+    <button
+      (click)="saveUser(user)"
+      [class]="pill ? 'rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-medium text-white' : 'mr-3 text-accent-400 transition hover:text-accent-500'"
+    >Save</button>
+    <button
+      (click)="cancelEdit()"
+      [class]="pill ? 'rounded-lg border border-border-strong px-3 py-1.5 text-xs text-muted-foreground' : 'text-faint-foreground transition hover:text-foreground'"
+    >Cancel</button>
+  } @else {
+    <button
+      (click)="toggleViolations(user)"
+      [class]="pill
+        ? 'rounded-lg border border-border-strong px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-surface-hover'
+        : 'text-muted-foreground transition hover:text-foreground'"
+    >
+      {{ expandedUserId() === user.id ? 'Hide violations' : 'Violations' }}
+    </button>
+    <button
+      (click)="startEdit(user.id, user.userName)"
+      [class]="pill
+        ? 'rounded-lg border border-border-strong px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-surface-hover'
+        : 'ml-3 text-muted-foreground transition hover:text-foreground'"
+    >
+      Rename
+    </button>
+    @if (user.role !== UserRole.SuperAdmin) {
+      @if (user.lastIpAddress) {
+        @if (isIpBanned(user.lastIpAddress)) {
+          <button
+            (click)="unbanIpByAddress(user.lastIpAddress)"
+            [class]="pill
+              ? 'rounded-lg border border-border-strong px-3 py-1.5 text-xs text-accent-400 transition hover:bg-surface-hover'
+              : 'ml-3 text-accent-400 transition hover:text-accent-500'"
+          >
+            Unban IP
+          </button>
+        } @else {
+          <button
+            (click)="banIpQuick(user.lastIpAddress, 'Вручную: IP пользователя ' + user.userName)"
+            [class]="pill
+              ? 'rounded-lg border border-danger/40 px-3 py-1.5 text-xs text-danger transition hover:bg-danger/10'
+              : 'ml-3 text-danger transition hover:text-danger-600'"
+          >
+            Ban IP
+          </button>
+        }
+      }
+      <button
+        (click)="toggleBan(user)"
+        [class]="pill
+          ? (user.isBanned
+              ? 'rounded-lg border border-border-strong px-3 py-1.5 text-xs text-accent-400 transition hover:bg-surface-hover'
+              : 'rounded-lg bg-danger px-3 py-1.5 text-xs font-medium text-white transition hover:bg-danger-600')
+          : (user.isBanned ? 'ml-3 text-accent-400 hover:text-accent-500' : 'ml-3 text-danger hover:text-danger-600')"
+      >
+        {{ user.isBanned ? 'Unban' : 'Ban' }}
+      </button>
+    }
+  }
+</ng-template>
+
+<ng-template #violationsPanel let-user>
+  <div class="mt-3 rounded-lg border border-border bg-surface-alt p-3">
+    <p class="mb-2 text-[11px] font-semibold text-foreground">Auto-moderation violations</p>
+    @let state = violationsOf(user.id);
+    @if (state === 'loading' || state === undefined) {
+      <p class="text-[11px] text-faint-foreground">Loading…</p>
+    } @else if (state === 'error') {
+      <p class="text-[11px] text-danger">Не удалось загрузить нарушения.</p>
+    } @else if (isViolationList(state)) {
+      @for (v of state; track v.id) {
+        <div class="border-t border-border py-2 first:border-t-0 first:pt-0">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+            <span class="text-faint-foreground">{{ formatDate(v.createdAt) }}</span>
+            <span class="rounded-md bg-surface-hover px-1.5 py-0.5 text-[10px] text-muted-foreground">{{ targetLabels[v.target] }}</span>
+            @if (v.resultedInBan) {
+              <span class="rounded-md bg-danger/15 px-1.5 py-0.5 text-[10px] font-medium text-danger">ban</span>
+            } @else if (v.strikeNumber > 0) {
+              <span class="rounded-md bg-busy/15 px-1.5 py-0.5 text-[10px] font-medium text-busy">strike {{ v.strikeNumber }}</span>
+            } @else {
+              <span class="rounded-md bg-surface-hover px-1.5 py-0.5 text-[10px] text-faint-foreground">no strike</span>
+            }
+            @if (v.ipAddress) {
+              <span class="font-mono text-faint-foreground">{{ v.ipAddress }}</span>
+              @if (isIpBanned(v.ipAddress)) {
+                <span class="rounded-md bg-danger/15 px-1.5 py-0.5 text-[10px] font-medium text-danger">IP banned</span>
+              } @else if (user.role !== UserRole.SuperAdmin) {
+                <button
+                  (click)="banIpQuick(v.ipAddress, 'Вручную: нарушение ' + user.userName)"
+                  class="text-[10px] text-danger transition hover:text-danger-600"
+                >
+                  Ban IP
+                </button>
+              }
+            }
+          </div>
+          <p class="mt-1 text-[11px] text-muted-foreground">
+            Found: <span class="text-danger">{{ v.matchedWords }}</span>
+          </p>
+          <p class="mt-0.5 whitespace-pre-wrap break-words text-[11px] text-foreground/80">{{ v.content }}</p>
+        </div>
+      } @empty {
+        <p class="text-[11px] text-faint-foreground">No violations</p>
+      }
+    }
+  </div>
+</ng-template>
+
+<ng-template #chatName let-chat>
+  @if (editingId() === chat.id) {
+    <input
+      [value]="draft()"
+      (input)="onDraftInput($event)"
+      (keydown.enter)="saveChat(chat)"
+      (keydown.escape)="cancelEdit()"
+      autofocus
+      class="w-full rounded-md border border-border-strong bg-surface px-2 py-1 text-xs
+             text-foreground outline-none focus:border-accent-500"
+    />
+  } @else {
+    <span class="text-xs text-foreground">{{ chat.name ?? '—' }}</span>
+  }
+</ng-template>
+
+<ng-template #chatVisibility let-chat>
+  <button
+    (click)="togglePublic(chat)"
+    [title]="chat.isPublic ? 'Make private' : 'Make public'"
+    class="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium transition"
+    [class]="chat.isPublic
+      ? 'bg-online/15 text-online hover:bg-online/25'
+      : 'bg-surface-hover text-faint-foreground hover:text-foreground'"
+  >
+    {{ chat.isPublic ? 'public' : 'private' }}
+  </button>
+</ng-template>
+
+<ng-template #chatActions let-chat let-pill="pill">
+  @if (editingId() === chat.id) {
+    <button
+      (click)="saveChat(chat)"
+      [class]="pill ? 'rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-medium text-white' : 'mr-2 text-accent-400 transition hover:text-accent-500'"
+    >Save</button>
+    <button
+      (click)="cancelEdit()"
+      [class]="pill ? 'rounded-lg border border-border-strong px-3 py-1.5 text-xs text-muted-foreground' : 'text-faint-foreground transition hover:text-foreground'"
+    >Cancel</button>
+  } @else {
+    <button
+      (click)="startEdit(chat.id, chat.name)"
+      [class]="pill
+        ? 'rounded-lg border border-border-strong px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-surface-hover'
+        : 'mr-3 text-muted-foreground transition hover:text-foreground'"
+    >
+      Rename
+    </button>
+    <button
+      (click)="deleteChat(chat)"
+      [class]="pill
+        ? 'rounded-lg border border-danger/40 px-3 py-1.5 text-xs text-danger transition hover:bg-danger/10'
+        : 'text-danger transition hover:text-danger-600'"
+    >
+      Delete
+    </button>
+  }
+</ng-template>

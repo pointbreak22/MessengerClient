@@ -32,10 +32,11 @@ export const apiAuthInterceptor: HttpInterceptorFn = (req, next) => {
       return next(authReq);
     }),
     // BanEnforcementMiddleware answers every request of a blocked account with
-    // 403 { code: 'account_banned' }.
+    // 403 { code: 'account_banned' }, and of a blocked IP with 'ip_banned'.
     catchError((err: unknown) => {
-      if (err instanceof HttpErrorResponse && err.status === 403 && err.error?.code === 'account_banned') {
-        auth.markBanned();
+      if (err instanceof HttpErrorResponse && err.status === 403) {
+        if (err.error?.code === 'account_banned') auth.markBanned('account');
+        else if (err.error?.code === 'ip_banned') auth.markBanned('ip');
       }
       // Auto-moderation rejected the text (422 content_violation) — show why,
       // whichever screen sent it. Callers may still react (e.g. restore a draft).

@@ -18,6 +18,35 @@ export interface AdminUser {
   avatarUrl: string | null;
   isBanned: boolean;
   bannedAt: string | null;
+  // Auto-moderation warnings currently counting towards a ban (they expire
+  // after a quiet period server-side, and reset on unban).
+  moderationStrikes: number;
+  lastStrikeAt: string | null;
+  // IP of the most recent sign-in (GET /users/me), null if never recorded.
+  lastIpAddress: string | null;
+}
+
+// One auto-moderation hit, newest first (GET /admin/users/{id}/violations).
+export interface AdminViolation {
+  id: string;
+  target: 'Message' | 'UserName' | 'ChatName';
+  content: string;
+  matchedWords: string;
+  // 0 = no strike (superadmin), otherwise which warning this was.
+  strikeNumber: number;
+  resultedInBan: boolean;
+  ipAddress: string | null;
+  createdAt: string;
+}
+
+export interface AdminIpBan {
+  id: string;
+  ipAddress: string;
+  reason: string;
+  isAutomatic: boolean;
+  createdAt: string;
+  // null = permanent.
+  expiresAt: string | null;
 }
 
 export interface AdminChat {
@@ -60,6 +89,24 @@ export class AdminApiService {
 
   unbanUser(id: string): Observable<AdminUser> {
     return this.http.post<AdminUser>(`${this.base}${ApiEndpoints.admin.unban(id)}`, {});
+  }
+
+  listViolations(userId: string): Observable<AdminViolation[]> {
+    return this.http.get<AdminViolation[]>(`${this.base}${ApiEndpoints.admin.violations(userId)}`);
+  }
+
+  // Active bans only — expired ones aren't returned.
+  listIpBans(): Observable<AdminIpBan[]> {
+    return this.http.get<AdminIpBan[]>(`${this.base}${ApiEndpoints.admin.ipBans}`);
+  }
+
+  // days null/0 = permanent. Never affects the superadmin, so banning your own IP is safe.
+  banIp(ipAddress: string, reason: string | null, days: number | null): Observable<AdminIpBan> {
+    return this.http.post<AdminIpBan>(`${this.base}${ApiEndpoints.admin.ipBans}`, { ipAddress, reason, days });
+  }
+
+  unbanIp(banId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}${ApiEndpoints.admin.ipBan(banId)}`);
   }
 
   listPublicChats(page = 1, pageSize = 50, search?: string): Observable<AdminPage<AdminChat>> {
